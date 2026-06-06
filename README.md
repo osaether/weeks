@@ -1,6 +1,8 @@
 # WEEKS Microstrip Calculator with Dielectric Support
 ## YAML Input Format Version
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 ---
 
 ## About This Project
