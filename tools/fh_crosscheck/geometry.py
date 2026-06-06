@@ -16,7 +16,7 @@ def _coerce(key, value):
     if key == "name":
         return value
     if key in INT_KEYS:
-        return int(value)
+        return round(float(value))
     return float(value)
 
 
