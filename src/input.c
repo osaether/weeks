@@ -34,6 +34,28 @@ static double safe_atof(const char *str) {
     return str ? atof(str) : 0.0;
 }
 
+/* Skip unexpected nested structures */
+static int skip_node(yaml_parser_t *parser) {
+    yaml_event_t event;
+    int depth = 1;
+    
+    while (depth > 0) {
+        if (!yaml_parser_parse(parser, &event)) {
+            return 0;
+        }
+        
+        if (event.type == YAML_MAPPING_START_EVENT || event.type == YAML_SEQUENCE_START_EVENT) {
+            depth++;
+        } else if (event.type == YAML_MAPPING_END_EVENT || event.type == YAML_SEQUENCE_END_EVENT) {
+            depth--;
+        }
+        
+        yaml_event_delete(&event);
+    }
+    
+    return 1;
+}
+
 /* Parse a conductor from YAML */
 static int parse_conductor(yaml_parser_t *parser, conductor *c) {
     yaml_event_t event;
@@ -62,6 +84,13 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
         switch (event.type) {
             case YAML_MAPPING_END_EVENT:
                 in_mapping = 0;
+                break;
+                
+            case YAML_MAPPING_START_EVENT:
+            case YAML_SEQUENCE_START_EVENT:
+                skip_node(parser);
+                free(key);
+                key = NULL;
                 break;
                 
             case YAML_SCALAR_EVENT:
@@ -151,6 +180,7 @@ conductor *getinput(FILE *fp, int *n) {
     conductor *conductors;
     int conductor_count = 0;
     int in_conductors_sequence = 0;
+    int top_level_mapping_seen = 0;
     char *key = NULL;
     
     conductors = (conductor *)malloc(sizeof(conductor) * MAX_CONDUCTORS);
@@ -212,6 +242,10 @@ conductor *getinput(FILE *fp, int *n) {
                     in_conductors_sequence = 1;
                     free(key);
                     key = NULL;
+                } else {
+                    skip_node(&parser);
+                    free(key);
+                    key = NULL;
                 }
                 break;
                 
@@ -228,7 +262,14 @@ conductor *getinput(FILE *fp, int *n) {
                     } else {
                         fprintf(stderr, "WARNING: conductor limit (%d) reached;"
                                 " extra conductors ignored\n", MAX_CONDUCTORS);
+                        skip_node(&parser);
                     }
+                } else if (!top_level_mapping_seen) {
+                    top_level_mapping_seen = 1;
+                } else {
+                    skip_node(&parser);
+                    free(key);
+                    key = NULL;
                 }
                 break;
                 
