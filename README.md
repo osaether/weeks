@@ -18,18 +18,28 @@ While modern field solvers have become more sophisticated, this calculator remai
 
 ## Overview
 
-This is an enhanced version of the WEEKS microstrip resistance calculator with full support for FR4 and general dielectric substrates.
+This is an enhanced version of the WEEKS microstrip resistance calculator with support for reading FR4 and general dielectric substrate parameters.
+
+> **Scope:** This tool computes the **series resistance (R) and inductance (L)
+> matrices** of rectangular conductors using the PEEC method. The dielectric
+> parameters (`er`, `substrate_h`, `tan_delta`) are parsed and the effective
+> permittivity / dielectric loss are **reported on stderr for information only —
+> they are *not* applied to the R/L/|Z| results.** Capacitance, characteristic
+> impedance (Z0), and propagation velocity are **not** computed. As a result,
+> changing only the substrate material (e.g. air vs FR4) does not change the
+> output matrices. See [Understanding the Physics](#understanding-the-physics).
 
 ## Features
 
 ✅ **YAML input format** - Modern, human-readable configuration files  
-✅ **FR4 and dielectric substrate support**  
-✅ **Effective dielectric constant calculation** (Hammerstad-Jensen)  
-✅ **Dielectric loss modeling** (frequency-dependent tan δ)  
+✅ **Per-unit-length R and L matrices** for multi-conductor systems (PEEC)  
+✅ **Effective dielectric constant** (Hammerstad-Jensen) — *computed and printed to stderr for information; see [Scope](#overview)*  
+✅ **Dielectric loss** (frequency-dependent tan δ) — *computed and printed to stderr for information; not applied to results*  
 ✅ **Linux-compatible** (no Windows dependencies)  
 ✅ **Pre-defined material constants** (FR4, Rogers, Alumina, PTFE)  
 ✅ **Frequency defined in input file** - No need to recompile!  
 ✅ **Example YAML files** for multiple materials  
+✅ **Independent validation** against the FastHenry field solver (`make check-fasthenry`)  
 
 ## Quick Start
 
@@ -47,6 +57,12 @@ make
 make test-fr4     # FR4 substrate
 make test-air     # Air (baseline comparison)
 make test-rogers  # Rogers RO4003C
+
+# Validate R/L against the FastHenry field solver (needs fasthenry on PATH)
+make check-fasthenry
+
+# Run the cross-check harness unit tests
+python3 -m pytest tools/fh_crosscheck/
 ```
 
 ## Requirements
@@ -69,13 +85,19 @@ sudo dnf install meschach-devel libyaml-devel
 ```
 
 #### From Source (Meschach):
+The original Meschach homepage is no longer available. On Debian/Ubuntu the
+easiest way to get the source is the distribution source package:
 ```bash
-wget http://homepage.math.uiowa.edu/~dstewart/meschach/meschach.tar.gz
-tar xzf meschach.tar.gz
-cd meschach
-make
+# Enable deb-src for the 'universe' component first, then:
+apt-get source meschach          # unpacks meschach-1.2b/ with Debian patches
+cd meschach-1.2b
+./configure && make
 sudo make install
 ```
+On GCC 10+ you may need `-fcommon` (e.g. `make CFLAGS='-O2 -fcommon'`) because
+Meschach relies on legacy common-symbol linkage. See
+[docs/fasthenry-crosscheck.md](docs/fasthenry-crosscheck.md) for the same note
+applied to FastHenry.
 
 #### From Source (libyaml):
 ```bash
@@ -199,7 +221,12 @@ conductors:
     tan_delta: 0.0
 ```
 
-**Tip**: Copy one of the example files from `examples/` directory and modify it for your needs!
+**Tip**: Copy one of the ready-made files from the `examples/` directory
+(`test_air.yaml`, `test_fr4.yaml`, `test_rogers4003.yaml`, `test_single.yaml`)
+and modify it for your needs. The material blocks above show only the dielectric
+values to plug in — RO4350B does not have its own example file, so copy
+`test_rogers4003.yaml` and change the three dielectric fields. (Recall that the
+dielectric values do not change the R/L/|Z| output; see [Scope](#overview).)
 
 ## Compilation
 
@@ -288,8 +315,14 @@ FREQUENCY: 3.000000e+07 Hz (30.00 MHz)
 
 ## Understanding the Physics
 
+> **Note:** The formulas and table in this section describe general microstrip
+> behavior as background. **This tool does not apply them to its output** — it
+> reports εeff and the dielectric-loss term on stderr for information only, and
+> solves the series R and L matrices alone. Capacitance, Z0, and velocity are
+> not computed. See [Scope](#overview).
+
 ### Effective Dielectric Constant
-For microstrip, the EM field exists partly in the dielectric and partly in air. The effective dielectric constant εeff is calculated using:
+For microstrip, the EM field exists partly in the dielectric and partly in air. The effective dielectric constant εeff is calculated (and printed to stderr) using:
 
 ```
 εeff = (εr + 1)/2 + ((εr - 1)/2) × F(w/h)
@@ -298,15 +331,20 @@ For microstrip, the EM field exists partly in the dielectric and partly in air. 
 where F(w/h) is the Hammerstad-Jensen approximation.
 
 ### Dielectric Loss
-Dielectric loss contributes additional resistance:
+In a full model, dielectric loss would contribute additional resistance:
 
 ```
 R_dielectric = (ω√εeff/c) × ((εr-1)/(εeff-1)) × (εeff/εr) × tan(δ)
 ```
 
-This is frequency-dependent and becomes more significant at higher frequencies.
+This term is **computed and printed to stderr for information only — it is not
+added to the output R matrix.**
 
-### What Changes with Dielectric?
+### What Would Change with Dielectric (general theory)
+
+The table below describes microstrip behavior in general. **This tool computes
+none of these quantities** (it solves only R and L); it is included as physical
+background, which is why air and FR4 inputs produce the same R/L/|Z| output here.
 
 | Parameter | Air (εr=1.0) | FR4 (εr=4.4) | Effect |
 |-----------|-------------|--------------|--------|
@@ -319,17 +357,21 @@ This is frequency-dependent and becomes more significant at higher frequencies.
 ## Directory Structure
 
 ```
-weeks_lowercase/
+weeks/
 ├── README.md              # This file
 ├── INSTALL.md             # Quick start guide
+├── YAML_USER_GUIDE.md     # Detailed YAML input reference
 ├── LICENSE                # MIT license
 ├── Makefile               # Build script
+├── CLAUDE.md              # Guidance for AI coding assistants
+├── diagnostic_report.md   # PEEC vs FastHenry discretization analysis
+├── test.yaml              # Active input file read by ./weeks
 │
 ├── src/                   # Source files (5 files, lowercase .c)
 │   ├── weeks.c            # Main program (with YAML support)
-│   ├── calcl.c            # Calculator with dielectric
+│   ├── calcl.c            # Impedance matrix; effective εr / dielectric loss
 │   ├── input.c            # YAML parser using libyaml
-│   ├── build.c            # Element builder
+│   ├── build.c            # Element/mesh builder
 │   └── lpp.c              # Partial inductance formulas
 │                          # (complex solvers provided by libmeschach)
 │
@@ -338,14 +380,21 @@ weeks_lowercase/
 │   ├── calcl.h            # Calculator header
 │   └── lpp.h              # Partial inductance header
 │
-├── examples/              # YAML input examples (4 files)
+├── examples/              # YAML input examples (5 files)
 │   ├── test.yaml          # Default (FR4)
 │   ├── test_air.yaml      # Air baseline
 │   ├── test_fr4.yaml      # FR4 standard PCB
-│   └── test_rogers4003.yaml  # Rogers RO4003C
+│   ├── test_rogers4003.yaml  # Rogers RO4003C
+│   └── test_single.yaml   # Single trace (used by check-fasthenry)
+│
+├── tools/                 # FastHenry cross-check harness (Python, stdlib-only)
+│   └── fh_crosscheck/     # Compares weeks R/L against FastHenry; has unit tests
 │
 ├── docs/                  # Additional documentation
-│   └── fasthenry-crosscheck.md  # FastHenry cross-check setup
+│   ├── fasthenry-crosscheck.md    # FastHenry cross-check setup
+│   └── meschach-static-analysis.md # cppcheck report on linked Meschach
+│
+├── .github/workflows/     # CI (build + test on push/PR)
 │
 └── build/                 # Build artifacts (auto-created by make)
     └── *.o                # Object files
@@ -386,7 +435,7 @@ make LDFLAGS='-L/path/to/meschach/lib'
 ### Algorithm
 - **Method**: Partial Element Equivalent Circuit (PEEC)
 - **Formulation**: Weeks method (IBM, 1979)
-- **Frequency**: Quasi-static (valid up to ~1 GHz)
+- **Frequency**: Quasi-static (valid in the low-GHz range; the Rogers examples run at 1–2 GHz)
 - **Matrix**: Complex impedance Z = R + jωL
 
 ### Modifications from Original MWEEKS
@@ -400,7 +449,7 @@ make LDFLAGS='-L/path/to/meschach/lib'
 ### Backward Compatibility
 - Omitting dielectric parameters defaults to air (εr=1.0)
 - Original input files work without modification
-- Results match original code when dielectric params are omitted
+- Because the dielectric parameters do not affect the R/L/|Z| matrices, results match the original code whether or not dielectric params are supplied
 
 ## References
 
@@ -419,7 +468,7 @@ make LDFLAGS='-L/path/to/meschach/lib'
 
 ## License
 
-Changed to MIT license after uploading to github
+MIT License — see [LICENSE](LICENSE). (The project was relicensed to MIT when it was published on GitHub.)
 
 ## Credits
 
@@ -430,9 +479,12 @@ Changed to MIT license after uploading to github
 
 ## Support
 
-For issues or questions:
-1. Check this README
-2. Verify Meschach installation
-3. Compare with provided examples
-4. Validate with external tools (FastHenry, online calculators)
+Questions, bug reports, and contributions are welcome via
+[GitHub Issues](https://github.com/osaether/weeks/issues) and pull requests.
+
+Before opening an issue, it may help to:
+1. Check this README and the [YAML User Guide](YAML_USER_GUIDE.md)
+2. Verify the Meschach and libyaml installation (`make check-deps`)
+3. Compare against the provided `examples/`
+4. Validate with external tools (`make check-fasthenry`, online calculators)
 

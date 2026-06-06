@@ -3,10 +3,10 @@
 
 ## 🚀 5-Minute Setup
 
-### Step 1: Extract
+### Step 1: Clone
 ```bash
-unzip weeks_yaml.zip
-cd weeks_yaml
+git clone https://github.com/osaether/weeks.git
+cd weeks
 ```
 
 ### Step 2: Check Dependencies
@@ -52,6 +52,7 @@ Done! 🎉
 - `test_air.yaml` - Air baseline
 - `test_fr4.yaml` - FR4 standard PCB
 - `test_rogers4003.yaml` - Rogers RO4003C
+- `test_single.yaml` - Single trace (used by `make check-fasthenry`)
 
 **To try different materials**:
 ```bash
@@ -134,25 +135,30 @@ sudo apt-get install libmeschach-dev
 ```
 
 ### Wrong results?
-- Check substrate_h is in METERS (not mm!)
-- Verify εr looks reasonable (FR4 ≈ 4.4)
-- Test with air first (er=1.0)
-- Compare examples in `examples/` directory
+- Check all **geometry** dimensions are in METERS, not mm (`w`, `h`, `x`, `y`)
+- Sanity-check the mesh (`nw`, `nh`, `b`) and compare against `examples/`
+- Cross-check against FastHenry: `make check-fasthenry`
+- Note: `er`, `substrate_h`, and `tan_delta` are informational only and do **not**
+  change the R/L/|Z| output (the tool solves series R and L), so air vs FR4 will
+  look identical — that is expected, not a bug.
 
 ---
 
 ## Documentation
 
-- **README.md** - Complete user guide with YAML format details
-- See examples in `examples/` directory
+- **README.md** - Complete user guide and project overview
+- **YAML_USER_GUIDE.md** - Detailed YAML input reference
+- **docs/fasthenry-crosscheck.md** - FastHenry cross-check setup
+- **docs/meschach-static-analysis.md** - Static-analysis report on the Meschach dependency
+- See examples in the `examples/` directory
 
 ---
 
 ## Next Steps
 
-1. ✅ **Validate**: Compare air vs FR4 results
+1. ✅ **Validate**: Run `make check-fasthenry` to cross-check R/L against FastHenry
 2. 🔧 **Customize**: Edit YAML files for your geometry
-3. 📊 **Verify**: Cross-check with FastHenry or online calculators
+3. 📊 **Verify**: Cross-check with online calculators too
 4. 🎯 **Use**: Apply to your PCB designs
 
 ---

@@ -201,7 +201,13 @@ b: 0.9   # Signal trace (more dense)
 
 ---
 
-### Required Dielectric Parameters
+### Optional Dielectric Parameters
+
+> **These parameters are optional and informational.** If omitted they default
+> to air (`er=1.0`, `substrate_h=0.0`, `tan_delta=0.0`). The effective
+> permittivity and dielectric loss are computed and printed to stderr, but they
+> are **not applied** to the R/L/|Z| matrices — this tool solves the series R and
+> L only. Supplying them does not change the numerical output.
 
 #### dielectric constant (er)
 Relative permittivity of substrate
