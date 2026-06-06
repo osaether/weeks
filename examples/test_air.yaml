@@ -1,0 +1,57 @@
+# Air Dielectric Baseline
+# No substrate - conductors in air
+
+frequency: 30e6  # 30 MHz
+
+conductors:
+  # Ground plane
+  - name: line0
+    w: 2800e-6
+    h: 2.0e-6
+    x: 0.0
+    y: 0.0
+    nw: 201
+    nh: 3
+    b: 0.2
+    er: 1.0          # Air
+    substrate_h: 0.0 # No substrate
+    tan_delta: 0.0   # No loss
+
+  # Signal trace 1
+  - name: line1
+    w: 150e-6
+    h: 18e-6
+    x: 600e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 1.0
+    substrate_h: 0.0
+    tan_delta: 0.0
+
+  # Signal trace 2
+  - name: line2
+    w: 150e-6
+    h: 18e-6
+    x: 825e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 1.0
+    substrate_h: 0.0
+    tan_delta: 0.0
+
+  # Signal trace 3
+  - name: line3
+    w: 150e-6
+    h: 18e-6
+    x: 1050e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 1.0
+    substrate_h: 0.0
+    tan_delta: 0.0

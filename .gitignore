@@ -1,0 +1,49 @@
+CLAUDE.md
+
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.exe
+weeks
+build_warnings.txt
+
+# Editor files
+*~
+*.swp
+*.swo
+.*.sw?
+*.bak
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Runtime files
+test.line
+*.out
+*.log
+
+# Compiled Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution
+dist/
+*.tar.gz
+*.zip
+
+# Worktrees
+.worktrees/
+
+# Local session logs (kept locally, not published)
+docs/2026-06-03-error-review-session.md
+docs/2026-06-03-full-session-log.md
+docs/superpowers/

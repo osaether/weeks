@@ -1,0 +1,57 @@
+# Rogers RO4003C Substrate
+# RF/Microwave PCB material
+
+frequency: 1e9  # 1 GHz (RF application)
+
+conductors:
+  # Ground plane
+  - name: line0
+    w: 2800e-6
+    h: 2.0e-6
+    x: 0.0
+    y: 0.0
+    nw: 201
+    nh: 3
+    b: 0.2
+    er: 3.38              # Rogers RO4003C
+    substrate_h: 0.813e-3 # 0.813mm (32 mil)
+    tan_delta: 0.0027     # Low loss for RF
+
+  # Signal trace 1
+  - name: line1
+    w: 150e-6
+    h: 18e-6
+    x: 600e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 3.38
+    substrate_h: 0.813e-3
+    tan_delta: 0.0027
+
+  # Signal trace 2
+  - name: line2
+    w: 150e-6
+    h: 18e-6
+    x: 825e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 3.38
+    substrate_h: 0.813e-3
+    tan_delta: 0.0027
+
+  # Signal trace 3
+  - name: line3
+    w: 150e-6
+    h: 18e-6
+    x: 1050e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 3.38
+    substrate_h: 0.813e-3
+    tan_delta: 0.0027

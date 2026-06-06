@@ -1,0 +1,57 @@
+# FR4 Microstrip Example
+# Standard PCB with FR4 substrate
+
+frequency: 30e6  # 30 MHz
+
+conductors:
+  # Ground plane (line0)
+  - name: line0
+    w: 2800e-6      # Width: 2.8mm
+    h: 2.0e-6       # Thickness: 2μm (copper)
+    x: 0.0
+    y: 0.0
+    nw: 201         # Width divisions
+    nh: 3           # Height divisions
+    b: 0.2          # Mesh density
+    er: 4.4         # FR4 dielectric constant
+    substrate_h: 1.6e-3   # 1.6mm FR4 substrate
+    tan_delta: 0.02       # Loss tangent at 1 GHz
+
+  # Signal trace 1
+  - name: line1
+    w: 150e-6       # Width: 150μm
+    h: 18e-6        # Thickness: 18μm
+    x: 600e-6       # Position: 600μm
+    y: 77e-6        # Height above ground: 77μm
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 4.4
+    substrate_h: 1.6e-3
+    tan_delta: 0.02
+
+  # Signal trace 2
+  - name: line2
+    w: 150e-6
+    h: 18e-6
+    x: 825e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 4.4
+    substrate_h: 1.6e-3
+    tan_delta: 0.02
+
+  # Signal trace 3
+  - name: line3
+    w: 150e-6
+    h: 18e-6
+    x: 1050e-6
+    y: 77e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 4.4
+    substrate_h: 1.6e-3
+    tan_delta: 0.02
