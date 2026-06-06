@@ -1,6 +1,7 @@
 # WEEKS Microstrip Calculator with Dielectric Support
 ## YAML Input Format Version
 
+[![CI](https://github.com/osaether/weeks/actions/workflows/ci.yml/badge.svg)](https://github.com/osaether/weeks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
