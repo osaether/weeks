@@ -10,15 +10,17 @@
 
 I created this project in the mid-90s and have uploaded it to GitHub in case someone finds it useful.
 
-This code implements the partial inductance formulas developed by W.T. Weeks et al. at IBM Research in 1979. The original work was groundbreaking for calculating resistance and inductance in rectangular conductors, accounting for skin effect and proximity effect. My MWEEKS implementation built upon this foundation, and the recent 2025 enhancements add support for real-world PCB materials like FR4 and Rogers substrates.
+This code implements the partial inductance formulas developed by W.T. Weeks et al. at IBM Research in 1979. The original work was groundbreaking for calculating resistance and inductance in rectangular conductors, accounting for skin effect and proximity effect. This Weeks implementation is built upon this foundation, and the recent 2025 enhancements add support for real-world PCB materials like FR4 and Rogers substrates.
 
 While modern field solvers have become more sophisticated, this calculator remains valuable for quick impedance estimates and understanding the fundamental physics of microstrip transmission lines. It's particularly useful for educational purposes and preliminary PCB design work.
+
+I used Claude Code and Google Antigravity to port this project to Linux and to create tests.
 
 ---
 
 ## Overview
 
-This is an enhanced version of the WEEKS microstrip resistance calculator with support for reading FR4 and general dielectric substrate parameters.
+This is an enhanced version of the Weeks microstrip resistance calculator with support for reading FR4 and general dielectric substrate parameters.
 
 > **Scope:** This tool computes the **series resistance (R) and inductance (L)
 > matrices** of rectangular conductors using the PEEC method. The dielectric
@@ -34,8 +36,7 @@ This is an enhanced version of the WEEKS microstrip resistance calculator with s
 ✅ **YAML input format** - Modern, human-readable configuration files  
 ✅ **Per-unit-length R and L matrices** for multi-conductor systems (PEEC)  
 ✅ **Effective dielectric constant** (Hammerstad-Jensen) — *computed and printed to stderr for information; see [Scope](#overview)*  
-✅ **Dielectric loss** (frequency-dependent tan δ) — *computed and printed to stderr for information; not applied to results*  
-✅ **Linux-compatible** (no Windows dependencies)  
+✅ **Dielectric loss** (frequency-dependent tan δ) — *computed and printed to stderr for information; not applied to results*
 ✅ **Pre-defined material constants** (FR4, Rogers, Alumina, PTFE)  
 ✅ **Frequency defined in input file** - No need to recompile!  
 ✅ **Example YAML files** for multiple materials  
