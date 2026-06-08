@@ -5,6 +5,10 @@
 # signal trace bottom sits at y = 202 um, the 2 um ground plane top at y = 2 um,
 # so the dielectric height is 200 um. weeks computes eff_er and L from this same
 # geometry, so its Z0 matches the Hammerstad-Jensen closed form to ~0.03%.
+#
+# The trace is deliberately thin (18 um) here: the check's H-J reference is
+# zero-thickness, so a thin trace isolates the inductance comparison. The
+# material examples (test_fr4, etc.) use 35 um (1 oz copper) for realism.
 
 frequency: 30e6  # 30 MHz
 

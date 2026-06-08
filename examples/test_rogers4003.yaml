@@ -19,7 +19,7 @@ conductors:
   # Signal trace 1
   - name: line1
     w: 150e-6
-    h: 18e-6
+    h: 35e-6
     x: 600e-6
     y: 0.815e-3      # 0.813 mm above the 2μm ground-plane top (= substrate height)
     nw: 21
@@ -31,7 +31,7 @@ conductors:
   # Signal trace 2
   - name: line2
     w: 150e-6
-    h: 18e-6
+    h: 35e-6
     x: 825e-6
     y: 0.815e-3
     nw: 21
@@ -43,7 +43,7 @@ conductors:
   # Signal trace 3
   - name: line3
     w: 150e-6
-    h: 18e-6
+    h: 35e-6
     x: 1050e-6
     y: 0.815e-3
     nw: 21
