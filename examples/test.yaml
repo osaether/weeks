@@ -14,7 +14,6 @@ conductors:
     nh: 3           # Height divisions
     b: 0.2          # Mesh density
     er: 4.4         # FR4 dielectric constant
-    substrate_h: 1.6e-3   # 1.6mm FR4 substrate
     tan_delta: 0.02       # Loss tangent at 1 GHz
 
   # Signal trace 1
@@ -27,7 +26,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 
   # Signal trace 2
@@ -40,7 +38,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 
   # Signal trace 3
@@ -53,5 +50,4 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02

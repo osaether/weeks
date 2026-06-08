@@ -72,39 +72,15 @@ void calcl(ZMAT *Z, element *e, double Omega,
   int dim;
   double lmm, lpi0, r00;
   double sigma=58e6;  /* Copper conductivity S/m */
-  double eff_er;
-  double diel_loss;
   VEC *lpj;
   dim = Z->m;
+  (void)cond;  /* dielectric is handled in calc_line_params(), not the matrix */
 
-  /* Effective permittivity and dielectric loss are NOT folded into the series
-   * R/L matrices: the dielectric attenuation (units 1/m) cannot be added to a
-   * resistance (units Ohm/m) without being dimensionally wrong. Instead they
-   * feed the per-line transmission-line parameters computed in
-   * calc_line_params() (Z0, C, total attenuation, propagation gamma), where
-   * the dielectric loss enters the shunt side of the line correctly. The
-   * stderr prints below remain as a quick informational trace. */
-  if (cond != NULL && cond[0].substrate_h > 0.0) {
-    eff_er = calc_eff_dielectric(cond[0].w, cond[0].substrate_h, cond[0].er);
-    fprintf(stderr, "\n  Ground plane effective εr: %.3f", eff_er);
-
-    diel_loss = calc_dielectric_loss(cond[0].er, cond[0].tan_delta,
-                                     Omega, cond[0].w, cond[0].substrate_h);
-    fprintf(stderr, "\n  Dielectric attenuation (informational): %.3e 1/m", diel_loss);
-  } else {
-    eff_er = 1.0;  /* Air */
-    diel_loss = 0.0;
-  }
-
-  /* Report effective permittivity per signal conductor (informational, not
-   * applied -- see note above). Uses the correct per-conductor properties. */
-  if (cond != NULL) {
-    for (i = 1; i <= N; i++) {
-      if (cond[i].substrate_h > 0.0)
-        fprintf(stderr, "\n  Line %d effective εr: %.3f", i,
-                calc_eff_dielectric(cond[i].w, cond[i].substrate_h, cond[i].er));
-    }
-  }
+  /* The dielectric does NOT enter the series R/L matrices: those are purely
+   * geometric (and dielectric attenuation, units 1/m, cannot be added to a
+   * resistance in Ohm/m). The effective permittivity and loss feed the per-
+   * line transmission-line parameters in calc_line_params() instead, where the
+   * dielectric loss enters the shunt side of the line correctly. */
 
   lmm = lp (&e0, &e0);
   r00 = 1/(sigma*(e0.x2-e0.x1)*(e0.y2-e0.y1));
@@ -142,6 +118,16 @@ void calcl(ZMAT *Z, element *e, double Omega,
     Z->me[i][i].re += 1/(sigma*(e[i].x2-e[i].x1)*(e[i].y2-e[i].y1));
 }
 
+/* Substrate height for signal conductor `line_index` (1-based): the vertical
+ * gap between the bottom of the trace and the top of the ground plane,
+ * cond[0]. For a microstrip the substrate fills exactly this gap, so the
+ * dielectric height is a property of the geometry -- not a separate input.
+ * Returns <= 0 if the trace is not above the ground plane. */
+double substrate_height(const conductor *cond, int line_index)
+{
+  return cond[line_index].y - (cond[0].y + cond[0].h);
+}
+
 /* Per-line (quasi-TEM) transmission-line parameters.
  *
  * This is where the dielectric finally affects a reported result. The series
@@ -168,25 +154,14 @@ void calc_line_params(ZMAT *z, double Omega, conductor *cond, int N)
   for (i = 1; i <= N; i++) {
     double R_ii = z->me[i-1][i-1].re;        /* Ohm/m */
     double L_ii = z->me[i-1][i-1].im / Omega; /* H/m   */
+    double h_sub = substrate_height(cond, i); /* trace-to-ground gap, m */
     double eff_er, beta, C, Z0, a_c, a_d, a_tot, tand_eff, eff_er_im;
 
-    eff_er = calc_eff_dielectric(cond[i].w, cond[i].substrate_h, cond[i].er);
+    /* Substrate height is the geometric trace-to-ground gap, so eff_er and L
+     * are consistent by construction (no separate substrate_h to disagree). */
+    eff_er = calc_eff_dielectric(cond[i].w, h_sub, cond[i].er);
     if (eff_er < 1.0)
       eff_er = 1.0;                          /* air / no substrate */
-
-    /* Consistency check: eff_er (hence Z0/C) uses substrate_h, but L comes
-     * from the actual conductor geometry. If the trace's geometric gap to the
-     * ground plane (cond[0]) does not match substrate_h, the reported Z0 mixes
-     * two different heights and is not physically meaningful. Warn on stderr. */
-    if (cond[i].substrate_h > 0.0) {
-      double gap = cond[i].y - (cond[0].y + cond[0].h);
-      if (fabs(gap - cond[i].substrate_h) > 0.05 * cond[i].substrate_h)
-        fprintf(stderr,
-                "\n  WARNING: line %d geometric gap to ground (%.3e m) != "
-                "substrate_h (%.3e m);\n           Z0/C below mix L (from "
-                "geometry) with eff_er (from substrate_h).\n",
-                i, gap, cond[i].substrate_h);
-    }
 
     if (L_ii <= 0.0) {
       /* Degenerate line: cannot form C/Z0. Report what we have. */
@@ -200,7 +175,7 @@ void calc_line_params(ZMAT *z, double Omega, conductor *cond, int N)
 
     a_c  = R_ii / (2.0 * Z0);                /* Np/m  */
     a_d  = calc_dielectric_loss(cond[i].er, cond[i].tan_delta,
-                                Omega, cond[i].w, cond[i].substrate_h); /* Np/m */
+                                Omega, cond[i].w, h_sub); /* Np/m */
     a_tot = a_c + a_d;                       /* Np/m  */
 
     /* gamma = a_tot + j*beta. Express the dielectric loss as an effective

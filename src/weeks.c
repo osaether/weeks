@@ -65,17 +65,14 @@ int main(void)
     exit(EXIT_FAILURE);
   fprintf(stderr, "\nNumber of elements: %d", M);
 
-  /* Display dielectric information */
+  /* Display dielectric information. The substrate height is the trace-to-
+   * ground gap, derived from geometry (not an input). */
   fprintf(stderr, "\n\nDielectric Properties:");
-  fprintf(stderr, "\n  Ground plane (line0): εr=%.2f, h=%.2e m", 
-          test[0].er, test[0].substrate_h);
-  if(test[0].tan_delta > 0.0)
-    fprintf(stderr, ", tan δ=%.4f", test[0].tan_delta);
-  
+  fprintf(stderr, "\n  Ground plane (line0): εr=%.2f", test[0].er);
+
   for(i=1; i<=N; i++) {
-    fprintf(stderr, "\n  Line %d: εr=%.2f", i, test[i].er);
-    if(test[i].substrate_h > 0.0)
-      fprintf(stderr, ", h=%.2e m", test[i].substrate_h);
+    fprintf(stderr, "\n  Line %d: εr=%.2f, substrate h=%.2e m (from geometry)",
+            i, test[i].er, substrate_height(test, i));
     if(test[i].tan_delta > 0.0)
       fprintf(stderr, ", tan δ=%.4f", test[i].tan_delta);
   }

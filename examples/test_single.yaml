@@ -14,7 +14,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 
   # Signal trace
@@ -27,5 +26,4 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02

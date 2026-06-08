@@ -14,7 +14,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 1.0          # Air
-    substrate_h: 0.0 # No substrate
     tan_delta: 0.0   # No loss
 
   # Signal trace 1
@@ -27,7 +26,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 1.0
-    substrate_h: 0.0
     tan_delta: 0.0
 
   # Signal trace 2
@@ -40,7 +38,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 1.0
-    substrate_h: 0.0
     tan_delta: 0.0
 
   # Signal trace 3
@@ -53,5 +50,4 @@ conductors:
     nh: 7
     b: 0.9
     er: 1.0
-    substrate_h: 0.0
     tan_delta: 0.0
