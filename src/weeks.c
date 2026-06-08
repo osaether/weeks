@@ -37,7 +37,7 @@ int main(void)
 
   if ((fp = fopen("test.yaml", "r")) == NULL)
     {
-      fprintf(stderr, "ERROR: Can not open input file '%s'\n", "test.yaml");
+      fprintf(stderr, "ERROR: Cannot open input file '%s'\n", "test.yaml");
       fprintf(stderr, "Please create a YAML input file with conductor definitions.\n");
       exit(EXIT_FAILURE);
     }
