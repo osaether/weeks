@@ -23,24 +23,24 @@ I used Claude Code and Google Antigravity to port this project to Linux and to c
 This is an enhanced version of the Weeks microstrip resistance calculator with support for reading FR4 and general dielectric substrate parameters.
 
 > **Scope:** This tool computes the **series resistance (R) and inductance (L)
-> matrices** of rectangular conductors using the PEEC method. The dielectric
-> parameters (`er`, `substrate_h`, `tan_delta`) are parsed and the effective
-> permittivity / dielectric loss are **reported on stderr for information only —
-> they are *not* applied to the R/L/|Z| results.** Capacitance, characteristic
-> impedance (Z0), and propagation velocity are **not** computed. As a result,
-> changing only the substrate material (e.g. air vs FR4) does not change the
-> output matrices. See [Understanding the Physics](#understanding-the-physics).
+> matrices** of rectangular conductors using the PEEC method. These matrices are
+> dielectric-independent (μr≈1), so changing only the substrate material (e.g.
+> air vs FR4) does **not** change them. In addition, a per-line **quasi-TEM
+> transmission-line** section reports effective permittivity, characteristic
+> impedance (Z0), capacitance, attenuation and complex propagation γ — this is
+> where the dielectric (`er`, `tan_delta`) takes effect. The substrate **height**
+> is the trace-to-ground gap derived from the conductor geometry, not a separate
+> input. See [Understanding the Physics](#understanding-the-physics).
 
 ## Features
 
 ✅ **YAML input format** - Modern, human-readable configuration files  
 ✅ **Per-unit-length R and L matrices** for multi-conductor systems (PEEC)  
-✅ **Effective dielectric constant** (Hammerstad-Jensen) — *computed and printed to stderr for information; see [Scope](#overview)*  
-✅ **Dielectric loss** (frequency-dependent tan δ) — *computed and printed to stderr for information; not applied to results*
+✅ **Per-line transmission-line parameters** — effective permittivity (Hammerstad-Jensen), Z0, capacitance, attenuation (incl. dielectric loss) and complex propagation γ  
 ✅ **Pre-defined material constants** (FR4, Rogers, Alumina, PTFE)  
 ✅ **Frequency defined in input file** - No need to recompile!  
 ✅ **Example YAML files** for multiple materials  
-✅ **Independent validation** against the FastHenry field solver (`make check-fasthenry`)  
+✅ **Independent validation** against the FastHenry field solver (`make check-fasthenry`) and the Hammerstad-Jensen Z0 closed form (`make check-z0`)  
 
 ## Quick Start
 
@@ -131,19 +131,17 @@ conductors:
     nh: 3            # Height mesh divisions
     b: 0.2           # Mesh density parameter
     er: 4.4          # Dielectric constant
-    substrate_h: 1.6e-3    # Substrate height (METERS!)
     tan_delta: 0.02        # Loss tangent
     
-  - name: line1      # Signal trace
+  - name: line1      # Signal trace; its y sets the substrate height (gap to ground)
     w: 150e-6
     h: 18e-6
     x: 600e-6
-    y: 77e-6
+    y: 202e-6        # 200 um above the ground-plane top => the substrate height
     nw: 21
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
@@ -156,7 +154,8 @@ conductors:
 - `w`: Conductor width (meters)
 - `h`: Conductor thickness/height (meters)  
 - `x`: X-position of the left edge (min-x corner) (meters)
-- `y`: Y-position of conductor bottom (meters)
+- `y`: Y-position of conductor bottom (meters). For a signal trace, its height
+  above the ground-plane top is the substrate height used for εeff/Z0.
 
 **Mesh Parameters:**
 - `nw`: Number of divisions along width
@@ -165,8 +164,11 @@ conductors:
 
 **Dielectric Parameters:**
 - `er`: Relative permittivity (dielectric constant)
-- `substrate_h`: Substrate height - distance to ground plane (METERS!)
 - `tan_delta`: Loss tangent at operating frequency
+
+The substrate **height** is not a parameter — it is derived from geometry as the
+gap between the signal trace bottom and the ground-plane top. A legacy
+`substrate_h:` key is ignored (with a note on stderr).
 
 **IMPORTANT**: All dimensions must be in **METERS**!
 - 1.6 mm = **1.6e-3** meters (not 1.6!)
@@ -182,7 +184,6 @@ conductors:
   - name: line0
     # ... geometry parameters ...
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
@@ -194,7 +195,6 @@ conductors:
   - name: line0
     # ... geometry parameters ...
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
 ```
 
@@ -206,7 +206,6 @@ conductors:
   - name: line0
     # ... geometry parameters ...
     er: 3.48
-    substrate_h: 0.508e-3
     tan_delta: 0.0037
 ```
 
@@ -218,7 +217,6 @@ conductors:
   - name: line0
     # ... geometry parameters ...
     er: 1.0
-    substrate_h: 0.0
     tan_delta: 0.0
 ```
 
@@ -316,44 +314,50 @@ FREQUENCY: 3.000000e+07 Hz (30.00 MHz)
 
 ## Understanding the Physics
 
-> **Note:** The formulas and table in this section describe general microstrip
-> behavior as background. **This tool does not apply them to its output** — it
-> reports εeff and the dielectric-loss term on stderr for information only, and
-> solves the series R and L matrices alone. Capacitance, Z0, and velocity are
-> not computed. See [Scope](#overview).
+> **Note:** The series R and L matrices are dielectric-independent (μr≈1). The
+> dielectric instead enters the per-line **TRANSMISSION-LINE PARAMETERS** section,
+> via a quasi-TEM model built on the geometry-derived substrate height. See
+> [Scope](#overview).
 
 ### Effective Dielectric Constant
-For microstrip, the EM field exists partly in the dielectric and partly in air. The effective dielectric constant εeff is calculated (and printed to stderr) using:
+For microstrip, the EM field exists partly in the dielectric and partly in air. The effective dielectric constant εeff is calculated using:
 
 ```
 εeff = (εr + 1)/2 + ((εr - 1)/2) × F(w/h)
 ```
 
-where F(w/h) is the Hammerstad-Jensen approximation.
+where F(w/h) is the Hammerstad-Jensen approximation and h is the substrate height
+(the geometry-derived trace-to-ground gap).
 
 ### Dielectric Loss
-In a full model, dielectric loss would contribute additional resistance:
+The dielectric loss is reported as an attenuation constant α_d (units 1/m):
 
 ```
-R_dielectric = (ω√εeff/c) × ((εr-1)/(εeff-1)) × (εeff/εr) × tan(δ)
+α_d = (ω√εeff/c) × ((εr-1)/(εeff-1)) × (εeff/εr) × tan(δ)
 ```
 
-This term is **computed and printed to stderr for information only — it is not
-added to the output R matrix.**
+It is **not** folded into the series R matrix (a 1/m attenuation cannot be added
+to an Ω/m resistance). Instead it enters the shunt side of the transmission-line
+model and shows up in the reported total attenuation and complex propagation γ.
 
-### What Would Change with Dielectric (general theory)
+### Per-line transmission-line parameters
 
-The table below describes microstrip behavior in general. **This tool computes
-none of these quantities** (it solves only R and L); it is included as physical
-background, which is why air and FR4 inputs produce the same R/L/|Z| output here.
+From each line's diagonal series R/L and the effective permittivity, the tool
+reports (quasi-TEM, single-line): capacitance C = εeff/(c²L), characteristic
+impedance Z0 = √(L/C), conductor + dielectric attenuation, phase constant β and
+complex propagation γ. So unlike the R/L matrices, this section **does** differ
+between air and FR4:
 
 | Parameter | Air (εr=1.0) | FR4 (εr=4.4) | Effect |
 |-----------|-------------|--------------|--------|
-| Capacitance | 1× | ~2.1× | Increases by √εeff |
+| Capacitance | 1× | ↑ | Increases by εeff |
 | Inductance | 1× | ~1× | Approximately same |
-| Z0 | 1× | ~0.5× | Decreases by √εeff |
+| Z0 | 1× | ↓ | Decreases by √εeff |
 | Loss | Conductor only | Conductor + Dielectric | Increases |
-| Velocity | c | ~0.5c | Slows down |
+| Velocity | c | c/√εeff | Slows down |
+
+This is a single-line characterization (it does not model inter-line capacitive
+coupling); cross-check it with `make check-z0`.
 
 ## Directory Structure
 
@@ -427,7 +431,10 @@ make LDFLAGS='-L/path/to/meschach/lib'
 ```
 
 ### Wrong Results
-- **Check units**: substrate_h must be in METERS!
+- **Check units**: all dimensions must be in METERS!
+- **Check trace height**: the substrate height is the signal trace's gap above
+  the ground plane — place the trace at the intended height (e.g. `y: 1.602e-3`
+  for a 1.6 mm substrate over a 2 µm ground plane)
 - **Check dielectric values**: Typical FR4 is εr=4.4, not 44!
 - **Compare with air**: Run with er=1.0 to verify baseline
 

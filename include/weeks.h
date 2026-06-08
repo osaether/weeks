@@ -8,9 +8,10 @@ typedef struct {
     int nh;                /* number of height divisions */
     int n;                 /* total number of elements (nw * nh) */
     
-    /* Dielectric properties (new) */
+    /* Dielectric material properties. The substrate *height* is NOT stored
+     * here: it is the trace-to-ground separation, derived from the geometry
+     * (signal y minus ground-plane top). See substrate_height() in calcl.c. */
     double er;             /* relative permittivity (dielectric constant) */
-    double substrate_h;    /* substrate height (distance to ground plane) */
     double tan_delta;      /* loss tangent (dielectric loss) */
 } conductor;
 

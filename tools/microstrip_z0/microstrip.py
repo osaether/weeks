@@ -8,11 +8,9 @@ eff_er and Z0 purely from the microstrip geometry (w, h, er). Agreement
 validates the PEEC inductance against a published closed form, complementing
 the FastHenry R/L crosscheck.
 
-Caveat: the comparison is only physically meaningful when the trace actually
-sits a distance ``substrate_h`` above the ground plane. weeks computes L from
-the conductors' y-coordinates but eff_er from ``substrate_h``; if those two
-heights disagree, weeks' own Z0 mixes inconsistent geometries and the check
-warns rather than asserting agreement.
+Both sides use the same substrate height -- the geometric trace-to-ground gap
+(``geometric_gap`` below) -- which is also what weeks uses for eff_er, so the
+comparison is consistent by construction.
 """
 
 import math

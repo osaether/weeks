@@ -71,7 +71,6 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
     c->nw = 10;
     c->nh = 10;
     c->er = 1.0;
-    c->substrate_h = 0.0;
     c->tan_delta = 0.0;
     
     while (in_mapping) {
@@ -120,7 +119,11 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
                     } else if (strcmp(key, "er") == 0) {
                         c->er = safe_atof(value);
                     } else if (strcmp(key, "substrate_h") == 0) {
-                        c->substrate_h = safe_atof(value);
+                        /* Deprecated/ignored: the substrate height is derived
+                         * from the conductor geometry (trace-to-ground gap),
+                         * not read from the input. */
+                        fprintf(stderr, "\n  Note: 'substrate_h' is ignored; "
+                                "substrate height is derived from geometry");
                     } else if (strcmp(key, "tan_delta") == 0) {
                         c->tan_delta = safe_atof(value);
                     }
@@ -168,8 +171,8 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
 
     c->n = c->nw * c->nh;
 
-    fprintf(stderr, "\n  Conductor: w=%.2e, h=%.2e, er=%.2f, substrate_h=%.2e, tan_delta=%.4f",
-            c->w, c->h, c->er, c->substrate_h, c->tan_delta);
+    fprintf(stderr, "\n  Conductor: w=%.2e, h=%.2e, er=%.2f, tan_delta=%.4f",
+            c->w, c->h, c->er, c->tan_delta);
 
     return 1;
 }

@@ -9,51 +9,43 @@ def _pct(ref, val):
     return None if ref == 0 else 100.0 * (val - ref) / ref
 
 
-def check_z0(case_yaml, weeks_bin="./weeks", workdir=".", tol=10.0,
-             gap_tol=5.0):
+def check_z0(case_yaml, weeks_bin="./weeks", workdir=".", tol=10.0):
     """Compare weeks' per-line Z0 against the Hammerstad-Jensen closed form.
 
-    Returns ``(report_text, flagged)``. ``flagged`` is True if any line's Z0
-    differs by more than ``tol`` percent OR its geometry is inconsistent (the
-    trace-to-ground gap differs from ``substrate_h`` by more than ``gap_tol``
-    percent), which confounds the comparison.
+    Both weeks and the closed form use the same substrate height -- the
+    geometric trace-to-ground gap -- so the comparison is always consistent.
+    Returns ``(report_text, flagged)``; ``flagged`` is True if any line's Z0
+    differs by more than ``tol`` percent.
     """
     _freq, conductors = load_case(case_yaml)
     params = parse_line_params(run_weeks_text(case_yaml, weeks_bin, workdir))
 
     lines = [
         "*** Z0 SANITY CHECK: weeks vs Hammerstad-Jensen (%s) ***" % case_yaml,
-        "  line   geom_gap   substrate_h   weeks_Z0     H-J_Z0      %diff   note",
+        "  line   sub_h(m)    weeks_Z0     H-J_Z0      %diff   note",
     ]
     flagged = False
     for i, p in enumerate(params):
         sig = conductors[i + 1]
-        w, h, er = sig["w"], sig["substrate_h"], sig["er"]
-        gap = geometric_gap(conductors, i + 1)
+        w, er = sig["w"], sig["er"]
+        h = geometric_gap(conductors, i + 1)  # substrate height from geometry
 
         note = ""
-        gap_pct = _pct(h, gap) if h > 0 else None
-        if h <= 0:
-            note = "no substrate (air)"
-        elif gap_pct is not None and abs(gap_pct) > gap_tol:
-            note = "GEOMETRY MISMATCH: gap != substrate_h, Z0 comparison confounded"
-            flagged = True
-
-        if h > 0:
+        if er <= 1.0 or h <= 0.0:
+            note = "air / no dielectric (H-J not applicable)"
+            hj_text, pd_text = "        n/a", "    n/a"
+        else:
             _eff, hj_z0 = microstrip_z0(w, h, er)
             pd = _pct(hj_z0, p["z0"])
-            if pd is not None and abs(pd) > tol and not note:
-                note = "over %.0f%% tolerance" % tol
-                flagged = True
             hj_text = "%11.4e" % hj_z0
             pd_text = "  n/a" if pd is None else "%+7.2f%%" % pd
-        else:
-            hj_text = "        n/a"
-            pd_text = "    n/a"
+            if pd is not None and abs(pd) > tol:
+                note = "over %.0f%% tolerance" % tol
+                flagged = True
 
         lines.append(
-            "  %3d  %10.3e  %10.3e  %11.4e %s %s   %s"
-            % (i + 1, gap, h, p["z0"], hj_text, pd_text, note)
+            "  %3d  %10.3e  %11.4e %s %s   %s"
+            % (i + 1, h, p["z0"], hj_text, pd_text, note)
         )
 
     if not params:

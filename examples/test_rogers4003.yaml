@@ -14,7 +14,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 3.38              # Rogers RO4003C
-    substrate_h: 0.813e-3 # 0.813mm (32 mil)
     tan_delta: 0.0027     # Low loss for RF
 
   # Signal trace 1
@@ -27,7 +26,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
 
   # Signal trace 2
@@ -40,7 +38,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
 
   # Signal trace 3
@@ -53,5 +50,4 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
