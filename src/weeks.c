@@ -117,8 +117,8 @@ int main(void)
     }
     ti += test[i+1].n;
   }
-  free(test);
-  test=0;
+  /* test[] is freed after calc_line_params() below, which still needs the
+   * per-conductor dielectric/geometry fields. */
   z = zm_inverse(y, y);
   y = ZMNULL;  
 
@@ -168,7 +168,13 @@ int main(void)
     }
     printf("\n");
   }
-  
+
+  /* Per-line transmission-line parameters (Z0, C, attenuation, propagation).
+   * Reads the diagonal self-terms of z, so it must run before ZM_FREE(z). */
+  calc_line_params(z, Omega, test, N);
+
+  free(test);
+  test = 0;
   ZM_FREE(z);
   ZM_FREE(Z);   /* same pointer as Y after zm_inverse(Z,Z) */
   ts = time(&ts);
