@@ -82,36 +82,50 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4             # Dielectric constant
-    substrate_h: 1.6e-3 # Height in METERS (1.6mm)
     tan_delta: 0.02     # Loss tangent
+  - name: line1         # Signal trace; its y sets the substrate height
+    w: 150e-6
+    h: 35e-6            # 35 µm = 1 oz copper
+    x: 600e-6
+    y: 1.602e-3         # 1.6 mm above the ground-plane top (= substrate height)
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 4.4
+    tan_delta: 0.02
 ```
 
 **IMPORTANT**: All dimensions must be in **METERS**!
 - 1.6mm = 1.6e-3 ✅
 - 1.6mm ≠ 1.6 ❌
 
+The substrate **height** is not a parameter — it is the gap between the signal
+trace and the ground plane, derived from the `y` coordinates.
+
 ---
 
 ## Common Materials
 
-### FR4 Standard PCB
+Material properties are `er` / `tan_delta`; the substrate height comes from the
+trace's `y` (its height above the ground plane).
+
+### FR4 Standard PCB (1.6 mm)
 ```yaml
 er: 4.4
-substrate_h: 1.6e-3
 tan_delta: 0.02
+# place the signal trace at y = ground_top + 1.6e-3
 ```
 
-### Rogers RO4003C (RF)
+### Rogers RO4003C (RF, 0.813 mm)
 ```yaml
 er: 3.38
-substrate_h: 0.813e-3
 tan_delta: 0.0027
+# place the signal trace at y = ground_top + 0.813e-3
 ```
 
 ### Air (Baseline)
 ```yaml
 er: 1.0
-substrate_h: 0.0
 tan_delta: 0.0
 ```
 
@@ -138,9 +152,11 @@ sudo apt-get install libmeschach-dev
 - Check all **geometry** dimensions are in METERS, not mm (`w`, `h`, `x`, `y`)
 - Sanity-check the mesh (`nw`, `nh`, `b`) and compare against `examples/`
 - Cross-check against FastHenry: `make check-fasthenry`
-- Note: `er`, `substrate_h`, and `tan_delta` are informational only and do **not**
-  change the R/L/|Z| output (the tool solves series R and L), so air vs FR4 will
-  look identical — that is expected, not a bug.
+- Note: `er`/`tan_delta` do **not** change the R/L/|Z| matrices (those solve the
+  series R and L, which are dielectric-independent), so air vs FR4 look identical
+  there — expected, not a bug. The dielectric instead drives the separate
+  TRANSMISSION-LINE PARAMETERS section (Z0, C, attenuation); cross-check it with
+  `make check-z0`.
 
 ---
 

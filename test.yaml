@@ -14,44 +14,40 @@ conductors:
     nh: 3           # Height divisions
     b: 0.2          # Mesh density
     er: 4.4         # FR4 dielectric constant
-    substrate_h: 1.6e-3   # 1.6mm FR4 substrate
     tan_delta: 0.02       # Loss tangent at 1 GHz
 
   # Signal trace 1
   - name: line1
     w: 150e-6       # Width: 150μm
-    h: 18e-6        # Thickness: 18μm
+    h: 35e-6        # Thickness: 35μm (1 oz copper)
     x: 600e-6       # Position: 600μm
-    y: 77e-6        # Height above ground: 77μm
+    y: 1.602e-3     # 1.6 mm above the 2μm ground-plane top (= substrate height)
     nw: 21
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 
   # Signal trace 2
   - name: line2
     w: 150e-6
-    h: 18e-6
+    h: 35e-6
     x: 825e-6
-    y: 77e-6
+    y: 1.602e-3
     nw: 21
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 
   # Signal trace 3
   - name: line3
     w: 150e-6
-    h: 18e-6
+    h: 35e-6
     x: 1050e-6
-    y: 77e-6
+    y: 1.602e-3
     nw: 21
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02

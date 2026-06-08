@@ -143,12 +143,16 @@ x: 600e-6  # 600 micrometers from origin
 Vertical position of conductor bottom edge
 
 ```yaml
-y: 0.0      # Ground plane at y=0
-y: 77e-6    # Signal trace 77μm above ground
+y: 0.0        # Ground plane at y=0
+y: 1.602e-3   # Signal trace 1.6mm above a 2μm ground plane
 ```
 
 **Units:** Meters  
 **Reference:** y=0 typically at ground plane
+
+**Important:** for a signal trace, its height above the ground-plane top *is* the
+substrate height used for the effective permittivity / Z0 (there is no separate
+`substrate_h` input). Place the trace at `y = ground_top + substrate_thickness`.
 
 ---
 
@@ -203,11 +207,15 @@ b: 0.9   # Signal trace (more dense)
 
 ### Optional Dielectric Parameters
 
-> **These parameters are optional and informational.** If omitted they default
-> to air (`er=1.0`, `substrate_h=0.0`, `tan_delta=0.0`). The effective
-> permittivity and dielectric loss are computed and printed to stderr, but they
-> are **not applied** to the R/L/|Z| matrices — this tool solves the series R and
-> L only. Supplying them does not change the numerical output.
+> **`er` and `tan_delta` are optional material properties** (default air:
+> `er=1.0`, `tan_delta=0.0`). They do **not** change the series R/L/|Z| matrices
+> (those are dielectric-independent), but they **do** drive the separate per-line
+> TRANSMISSION-LINE PARAMETERS section (effective permittivity, Z0, capacitance,
+> attenuation, propagation γ).
+>
+> There is **no `substrate_h` parameter.** The substrate height is the trace-to-
+> ground gap, derived from geometry (a signal trace's `y` minus the ground
+> plane's top). A legacy `substrate_h:` key is ignored with a note on stderr.
 
 #### dielectric constant (er)
 Relative permittivity of substrate
@@ -224,24 +232,24 @@ er: 4.4  # FR4 standard value
 - 4.4 - FR4 (standard PCB)
 - 9.8 - Alumina ceramic
 
-#### substrate height (substrate_h)
-Distance from conductor to ground plane
+#### substrate height (derived from geometry — not an input)
+
+There is no `substrate_h` field. The substrate height is the gap between the
+signal trace and the ground plane, set by the trace's `y` position:
 
 ```yaml
-substrate_h: 1.6e-3  # 1.6mm FR4 board
+# ground plane: y=0, thickness h=2e-6  -> top at 2e-6
+# signal trace on a 1.6mm substrate:
+y: 1.602e-3   # 2e-6 (ground top) + 1.6e-3 (substrate) = trace bottom
 ```
 
-**Units:** METERS (not mm!)  
-**Common values:**
-- 0.0 - Air (no substrate)
-- 0.508e-3 - 20 mil (0.508mm)
-- 0.813e-3 - 32 mil (0.813mm)
+**Common substrate thicknesses to add above the ground-plane top (METERS!):**
+- 0.508e-3 - 20 mil
+- 0.813e-3 - 32 mil (Rogers standard)
 - 1.6e-3 - 1.6mm (standard FR4)
 - 3.2e-3 - 3.2mm (thick PCB)
 
-**⚠️ CRITICAL:** Must be in METERS!
-- 1.6mm = 1.6e-3 ✅
-- 1.6mm ≠ 1.6 ❌
+**⚠️ CRITICAL:** Must be in METERS! `1.6mm = 1.6e-3`, not `1.6`.
 
 #### loss tangent (tan_delta)
 Dielectric loss at operating frequency
@@ -301,7 +309,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4         # FR4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
     
   # Signal trace
@@ -314,7 +321,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
@@ -342,7 +348,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 3.38        # Rogers RO4003C
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
     
   # Differential pair - trace 1
@@ -355,7 +360,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
     
   # Differential pair - trace 2
@@ -368,7 +372,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
     
   # Clock signal
@@ -381,7 +384,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.38
-    substrate_h: 0.813e-3
     tan_delta: 0.0027
 ```
 
@@ -409,7 +411,6 @@ conductors:
     nh: 5
     b: 0.5
     er: 1.0         # Air
-    substrate_h: 0.0
     tan_delta: 0.0  # No loss
     
   # Signal conductor
@@ -422,7 +423,6 @@ conductors:
     nh: 5
     b: 0.7
     er: 1.0
-    substrate_h: 0.0
     tan_delta: 0.0
 ```
 
@@ -449,7 +449,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 2.1         # PTFE (Teflon)
-    substrate_h: 0.508e-3
     tan_delta: 0.0002  # Ultra-low loss
     
   - name: rf_line
@@ -461,7 +460,6 @@ conductors:
     nh: 5
     b: 0.9
     er: 2.1
-    substrate_h: 0.508e-3
     tan_delta: 0.0002
 ```
 
@@ -486,7 +484,7 @@ conductors:
 | Mesh density | b | ratio | 0.1 to 0.9 | `b: 0.9` |
 | **Dielectric** |
 | Permittivity | er | - | 1.0 to 10.0 | `er: 4.4` |
-| Substrate height | substrate_h | meters | 0 to 5e-3 | `substrate_h: 1.6e-3` |
+| Substrate height | *(from geometry)* | meters | set via trace `y` | `y: 1.602e-3` |
 | Loss tangent | tan_delta | - | 0.0 to 0.05 | `tan_delta: 0.02` |
 
 ---
@@ -495,11 +493,15 @@ conductors:
 
 ### Common PCB Materials
 
+Each material is defined by `er` and `tan_delta`. The substrate thickness in the
+comments is the gap to set via the trace's `y` (height above the ground plane),
+not a `substrate_h` field.
+
 #### FR4 (Standard PCB)
 ```yaml
 er: 4.4
-substrate_h: 1.6e-3      # 1.6mm standard
 tan_delta: 0.02          # At 1 GHz
+# substrate thickness 1.6mm  -> trace y = ground_top + 1.6e-3
 ```
 
 **Use cases:** General purpose PCBs, consumer electronics  
@@ -509,8 +511,8 @@ tan_delta: 0.02          # At 1 GHz
 #### Rogers RO4003C (RF Material)
 ```yaml
 er: 3.38
-substrate_h: 0.813e-3    # 32 mil
 tan_delta: 0.0027        # Low loss
+# substrate thickness 0.813mm (32 mil)  -> trace y = ground_top + 0.813e-3
 ```
 
 **Use cases:** RF, microwave, high-speed digital  
@@ -520,8 +522,8 @@ tan_delta: 0.0027        # Low loss
 #### Rogers RO4350B (High-Speed Digital)
 ```yaml
 er: 3.48
-substrate_h: 0.508e-3    # 20 mil
 tan_delta: 0.0037
+# substrate thickness 0.508mm (20 mil)  -> trace y = ground_top + 0.508e-3
 ```
 
 **Use cases:** High-speed digital, RF  
@@ -531,8 +533,8 @@ tan_delta: 0.0037
 #### PTFE / Teflon (Ultra-Low Loss)
 ```yaml
 er: 2.1
-substrate_h: 0.508e-3
 tan_delta: 0.0002        # Very low loss
+# substrate thickness 0.508mm  -> trace y = ground_top + 0.508e-3
 ```
 
 **Use cases:** Microwave, satellite, radar  
@@ -542,8 +544,8 @@ tan_delta: 0.0002        # Very low loss
 #### Alumina (Ceramic)
 ```yaml
 er: 9.8
-substrate_h: 0.635e-3    # 25 mil
 tan_delta: 0.001
+# substrate thickness 0.635mm (25 mil)  -> trace y = ground_top + 0.635e-3
 ```
 
 **Use cases:** Hybrid circuits, high power  
@@ -598,7 +600,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
     
   - name: fifty_ohm_line
@@ -610,7 +611,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
@@ -633,7 +633,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 3.48       # Rogers RO4350B
-    substrate_h: 0.508e-3
     tan_delta: 0.0037
     
   # Positive trace
@@ -646,7 +645,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.48
-    substrate_h: 0.508e-3
     tan_delta: 0.0037
     
   # Negative trace (100μm spacing for tight coupling)
@@ -659,7 +657,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 3.48
-    substrate_h: 0.508e-3
     tan_delta: 0.0037
 ```
 
@@ -683,7 +680,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4         # FR4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
     
   - name: signal
@@ -695,14 +691,12 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4         # FR4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
 Then change ONLY dielectric parameters for Rogers:
 ```yaml
     er: 3.38         # Rogers RO4003C
-    substrate_h: 1.6e-3
     tan_delta: 0.0027
 ```
 
@@ -718,9 +712,9 @@ Run both and compare impedance!
 
 | You Have | Convert To | Example |
 |----------|------------|---------|
-| 1.6 mm | 1.6e-3 | `substrate_h: 1.6e-3` |
+| 1.6 mm | 1.6e-3 | `y: 1.602e-3` |
 | 150 μm | 150e-6 | `w: 150e-6` |
-| 0.813 mm | 0.813e-3 | `substrate_h: 0.813e-3` |
+| 0.813 mm | 0.813e-3 | `y: 0.815e-3` |
 | 35 μm | 35e-6 | `h: 35e-6` |
 | 3 mm | 3e-3 | `w: 3e-3` |
 
@@ -833,9 +827,9 @@ Before running, verify:
    w: 150e-6  ✅
    w: 0.15    ❌  (this is 0.15 m = 150 mm!)
 
-✅ Substrate height reasonable
-   substrate_h: 1.6e-3    ✅ (1.6mm)
-   substrate_h: 1.6       ❌ (1.6 m = 1600 mm!)
+✅ Trace height (sets the substrate height) reasonable
+   y: 1.602e-3    ✅ (1.6mm above ground)
+   y: 1.6         ❌ (1.6 m = 1600 mm!)
 
 ✅ Spacing indented correctly (use spaces)
 
@@ -901,10 +895,10 @@ make
 
 ```yaml
 # WRONG - dimensions in mm instead of meters
-substrate_h: 1.6      # This is 1.6 METERS = 1600mm!
+y: 1.6      # This is 1.6 METERS = 1600mm above ground!
 
 # CORRECT
-substrate_h: 1.6e-3   # This is 1.6mm
+y: 1.602e-3   # 1.6mm above the ground plane
 ```
 
 ---
@@ -916,7 +910,7 @@ substrate_h: 1.6e-3   # This is 1.6mm
 **Solution:**
 1. Increase nw and nh
 2. Check conductor positions (y-values reasonable?)
-3. Verify substrate_h makes sense
+3. Verify trace heights (`y` above the ground plane) make sense
 
 ---
 
@@ -958,9 +952,9 @@ YAML doesn't have variable substitution, but you can use comments as templates:
 ```yaml
 # Template for signal traces on this board:
 # er: 4.4
-# substrate_h: 1.6e-3
 # tan_delta: 0.02
 # h: 35e-6
+# y: 1.602e-3   # 1.6mm above ground (sets the substrate height)
 
 frequency: 1e9
 
@@ -974,7 +968,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4        # Copy from template
-    substrate_h: 1.6e-3
     tan_delta: 0.02
     
   # ... more traces with same dielectric
@@ -984,17 +977,18 @@ conductors:
 
 ### Parametric Studies
 
-Create multiple files to study parameter effects:
+Create multiple files to study parameter effects. To sweep substrate height,
+vary the signal trace's `y` (its height above the ground-plane top):
 
 ```bash
-# test_1mm.yaml
-substrate_h: 1.0e-3
+# test_1mm.yaml   -> signal trace at
+y: 1.002e-3
 
-# test_1.6mm.yaml  
-substrate_h: 1.6e-3
+# test_1.6mm.yaml -> signal trace at
+y: 1.602e-3
 
-# test_2.4mm.yaml
-substrate_h: 2.4e-3
+# test_2.4mm.yaml -> signal trace at
+y: 2.402e-3
 ```
 
 Then run all:
@@ -1034,7 +1028,7 @@ w: 123.456e-6
 1. ✅ Start with `frequency:` in Hz
 2. ✅ Add `conductors:` list
 3. ✅ Each conductor starts with `- name:`
-4. ✅ Include all required parameters (w, h, x, y, nw, nh, b, er, substrate_h, tan_delta)
+4. ✅ Include all required parameters (w, h, x, y, nw, nh, b; optional er, tan_delta)
 5. ✅ Use METERS for all dimensions
 6. ✅ Use spaces for indentation (not tabs)
 7. ✅ Add comments to document your design
@@ -1065,7 +1059,6 @@ conductors:
     nh: 3
     b: 0.2
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
     
   # Signal trace
@@ -1078,7 +1071,6 @@ conductors:
     nh: 7
     b: 0.9
     er: 4.4
-    substrate_h: 1.6e-3
     tan_delta: 0.02
 ```
 
