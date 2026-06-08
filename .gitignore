@@ -25,3 +25,8 @@ __pycache__/
 dist/
 *.tar.gz
 *.zip
+
+# Local session artifacts (not part of the project docs)
+docs/2026-06-03-error-review-session.md
+docs/2026-06-03-full-session-log.md
+docs/superpowers/
