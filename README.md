@@ -439,7 +439,7 @@ make LDFLAGS='-L/path/to/meschach/lib'
 - **Frequency**: Quasi-static (valid in the low-GHz range; the Rogers examples run at 1–2 GHz)
 - **Matrix**: Complex impedance Z = R + jωL
 
-### Modifications from Original MWEEKS
+### Modifications from Original Weeks
 1. Added dielectric structure members to `conductor`
 2. Modified `src/input.c` to parse dielectric parameters
 3. Modified `src/calcl.c` to calculate effective εr and dielectric loss
@@ -476,7 +476,6 @@ MIT License — see [LICENSE](LICENSE). (The project was relicensed to MIT when 
 - **Original WEEKS code**: Ole Saether (1995)
 - **Weeks formulas**: W.T. Weeks et al., IBM (1979)
 - **Dielectric modifications**: 2025 enhancement
-- **MWEEKS version**: Enhanced implementation with built-in matrix operations
 
 ## Support
 

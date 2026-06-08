@@ -1,4 +1,4 @@
-/* Modified CALCL.C with dielectric support for MWEEKS
+/* Modified calcl.c with dielectric support for Weeks
  * 
  * Calculates partial inductances accounting for dielectric substrate
  * The dielectric primarily affects capacitance, but we account for
@@ -65,7 +65,7 @@ double calc_dielectric_loss(double er, double tan_delta,
   return loss_per_length;
 }
 
-void calcl (ZMAT *Z, element *e, double Omega,
+void calcl(ZMAT *Z, element *e, double Omega,
             element e0, conductor *cond, int N)
 {
   int i, j;

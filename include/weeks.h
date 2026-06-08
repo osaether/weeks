@@ -1,7 +1,3 @@
-/* Modified WEEKS.H with dielectric support for MWEEKS
- * Added support for FR4 and other dielectric materials
- */
-
 typedef struct {
     double w;              /* width */
     double h;              /* height */
@@ -20,12 +16,12 @@ typedef struct {
 
 #define MAX_CONDUCTORS 10
 
-conductor *getinput (FILE *, int *);
+conductor *getinput(FILE *, int *);
 
 typedef struct {
     double x1, x2, y1, y2;
 } element;
 
-element *build_elements (int, int, conductor *, element *);
+element *build_elements(int, int, conductor *, element *);
 
 /* lp() is declared in lpp.h; the dielectric helpers in calcl.h. */

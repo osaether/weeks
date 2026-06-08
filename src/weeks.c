@@ -13,7 +13,7 @@ extern double global_frequency;
 #define PI 3.141592653589793116
 #endif
 
-int main (void)
+int main(void)
 {
   int i, j, k, m;
   conductor *test;
@@ -35,18 +35,18 @@ int main (void)
   setbuf(stdout, (char *)NULL);
   setbuf(stderr, (char *)NULL);
 
-  if ((fp = fopen ("test.yaml", "r")) == NULL)
+  if ((fp = fopen("test.yaml", "r")) == NULL)
     {
-      fprintf (stderr, "ERROR: Can not open input file '%s'\n", "test.yaml");
-      fprintf (stderr, "Please create a YAML input file with conductor definitions.\n");
-      exit (EXIT_FAILURE);
+      fprintf(stderr, "ERROR: Can not open input file '%s'\n", "test.yaml");
+      fprintf(stderr, "Please create a YAML input file with conductor definitions.\n");
+      exit(EXIT_FAILURE);
     }
     
   fprintf(stderr, "\nReading YAML input file...");
   test = getinput (fp, &N);
   fclose(fp);
-  if (test == NULL)
-    exit (EXIT_FAILURE);
+  if(test == NULL)
+    exit(EXIT_FAILURE);
   N--;
   
   /* Use frequency from YAML file */
@@ -60,52 +60,52 @@ int main (void)
   n0 = M = test[0].nw*test[0].nh-1;
   for(i=1;i<=N;i++)
     M += test[i].nw*test[i].nh;
-  e = build_elements (M, N, test, &e0);
+  e = build_elements(M, N, test, &e0);
   if (e == NULL)
-    exit (EXIT_FAILURE);
+    exit(EXIT_FAILURE);
   fprintf(stderr, "\nNumber of elements: %d", M);
 
   /* Display dielectric information */
   fprintf(stderr, "\n\nDielectric Properties:");
   fprintf(stderr, "\n  Ground plane (line0): εr=%.2f, h=%.2e m", 
           test[0].er, test[0].substrate_h);
-  if (test[0].tan_delta > 0.0)
+  if(test[0].tan_delta > 0.0)
     fprintf(stderr, ", tan δ=%.4f", test[0].tan_delta);
   
   for(i=1; i<=N; i++) {
     fprintf(stderr, "\n  Line %d: εr=%.2f", i, test[i].er);
-    if (test[i].substrate_h > 0.0)
+    if(test[i].substrate_h > 0.0)
       fprintf(stderr, ", h=%.2e m", test[i].substrate_h);
-    if (test[i].tan_delta > 0.0)
+    if(test[i].tan_delta > 0.0)
       fprintf(stderr, ", tan δ=%.4f", test[i].tan_delta);
   }
 
   t1 = time(&t1);
-  Z = zm_get (M,M);
-  fprintf (stderr,"\n\nCalculating partial inductances with dielectric...");
+  Z = zm_get(M,M);
+  fprintf(stderr,"\n\nCalculating partial inductances with dielectric...");
   
   /* Call modified calcl with conductor array for dielectric info */
-  calcl (Z, e, Omega, e0, test, N);
+  calcl(Z, e, Omega, e0, test, N);
   
-  free (e);
+  free(e);
   e = NULL;
-  fprintf (stderr, " -> %lu seconds", (unsigned long)(time(NULL)-t1));
+  fprintf(stderr, " -> %lu seconds", (unsigned long)(time(NULL)-t1));
 
-  fprintf (stderr,"\n\nInverting matrix of partial impedances:\n");
+  fprintf(stderr,"\n\nInverting matrix of partial impedances:\n");
 
   Y = zm_inverse(Z, Z);
   
-  y = zm_get (N, N);
+  y = zm_get(N, N);
 
   ti = n0;
-  for (i=0;i<N;i++)
+  for(i=0;i<N;i++)
   {
     tk = n0;      
-    for (k=0;k<N;k++)
+    for(k=0;k<N;k++)
     {
       y->me[i][k].re = 0.0;
       y->me[i][k].im = 0.0;
-      for (j=0; j<test[i+1].n; j++)
+      for(j=0; j<test[i+1].n; j++)
       {
         for(m=0;m<test[k+1].n;m++)
         {
@@ -119,22 +119,22 @@ int main (void)
   }
   free(test);
   test=0;
-  z = zm_inverse (y, y);
+  z = zm_inverse(y, y);
   y = ZMNULL;  
 
   /* ===== RESULTS OUTPUT ===== */
-  printf ("\n\n========================================\n");
-  printf ("RESULTS\n");
-  printf ("========================================\n");
-  printf ("\nFREQUENCY: %e Hz (%.2f MHz)\n", f, f/1e6);
+  printf("\n\n========================================\n");
+  printf("RESULTS\n");
+  printf("========================================\n");
+  printf("\nFREQUENCY: %e Hz (%.2f MHz)\n", f, f/1e6);
     
   printf("\n*** RESISTANCE MATRIX (Ohm/m) ***\n\n");
   printf("    ");
   for(j=1;j<=N;j++)
     printf("%12d",j);
-  printf ("\n\n");
+  printf("\n\n");
   for(i=0;i<N;i++) {
-    printf ("%3d ",i+1);
+    printf("%3d ",i+1);
     for(j=0;j<N;j++)
       printf("%+0.4e ",z->me[i][j].re);
     printf("\n");
@@ -144,10 +144,10 @@ int main (void)
   printf("    ");
   for(j=1;j<=N;j++)
     printf("%12d",j);
-  printf ("\n\n");
+  printf("\n\n");
 
   for(i=0;i<N;i++) {
-    printf ("%3d ",i+1);
+    printf("%3d ",i+1);
     for(j=0;j<N;j++)
       printf("%+0.4e ",z->me[i][j].im/Omega);
     printf("\n");
@@ -157,10 +157,10 @@ int main (void)
   printf("    ");
   for(j=1;j<=N;j++)
     printf("%12d",j);
-  printf ("\n\n");
+  printf("\n\n");
 
   for(i=0;i<N;i++) {
-    printf ("%3d ",i+1);
+    printf("%3d ",i+1);
     for(j=0;j<N;j++) {
       double magnitude = sqrt(z->me[i][j].re * z->me[i][j].re + 
                               z->me[i][j].im * z->me[i][j].im);
@@ -169,8 +169,8 @@ int main (void)
     printf("\n");
   }
   
-  ZM_FREE (z);
-  ZM_FREE (Z);   /* same pointer as Y after zm_inverse(Z,Z) */
+  ZM_FREE(z);
+  ZM_FREE(Z);   /* same pointer as Y after zm_inverse(Z,Z) */
   ts = time(&ts);
 
   /* Dominant memory cost is the M x M complex impedance matrix, plus the

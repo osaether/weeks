@@ -30,7 +30,7 @@ static double F(double x, double y, double x2, double y2)
   return ((x2*x2-6*x2*y2+y2*y2)*logl(x2+y2)/24-x*y*(x2*atanl(y/x)+y2*atanl(x/y))/3);  
 }
 
-double lp (element *e1, element *e2)
+double lp(element *e1, element *e2)
 {
   double temp;
   double x11, x112, x12, x122, x21, x212, x22, x222;
