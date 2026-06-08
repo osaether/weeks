@@ -1081,7 +1081,6 @@ conductors:
 **In this package:**
 - `README.md` - Complete documentation
 - `examples/` - Working examples
-- `YAML_MIGRATION_GUIDE.md` - Migration details
 
 **External resources:**
 - YAML specification: yaml.org
@@ -1091,7 +1090,7 @@ conductors:
 ---
 
 **Version:** 1.0  
-**Last Updated:** February 8, 2025  
+**Last Updated:** June 8, 2026  
 **Format:** YAML 1.2  
 
 ---
