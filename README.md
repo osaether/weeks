@@ -1,5 +1,4 @@
-# WEEKS Microstrip Calculator with Dielectric Support
-## YAML Input Format Version
+# Weeks Microstrip Calculator with Dielectric Support
 
 [![CI](https://github.com/osaether/weeks/actions/workflows/ci.yml/badge.svg)](https://github.com/osaether/weeks/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -14,7 +13,7 @@ This code implements the partial inductance formulas developed by W.T. Weeks et 
 
 While modern field solvers have become more sophisticated, this calculator remains valuable for quick impedance estimates and understanding the fundamental physics of microstrip transmission lines. It's particularly useful for educational purposes and preliminary PCB design work.
 
-I used Claude Code and Google Antigravity to port this project to Linux and to create tests.
+I used Claude Code and Google Gemini to port this project to Linux and to create tests.
 
 ---
 

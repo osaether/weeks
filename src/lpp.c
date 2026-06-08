@@ -7,7 +7,7 @@
  * It is assumed that the permeability is equal to that of free space
  * (4 * PI * 1e-7).
  *
- * No attempt have been made to optimize the calculations. The
+ * No attempt has been made to optimize the calculations. The
  * calculations can be speeded up a bit by "writing out" the function
  * 'F' and combining terms.
  *
