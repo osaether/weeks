@@ -104,6 +104,11 @@ check-fasthenry: $(TARGET)
 	python3 -m tools.fh_crosscheck examples/test_single.yaml
 	python3 -m tools.fh_crosscheck examples/test_fr4.yaml
 
+# Sanity-check weeks per-line Z0 against the Hammerstad-Jensen microstrip
+# closed form (no external solver needed; stdlib-only Python).
+check-z0: $(TARGET)
+	python3 -m tools.microstrip_z0 examples/test_microstrip.yaml
+
 # Check dependencies
 check-deps:
 	@echo "Checking required libraries..."
@@ -132,6 +137,8 @@ help:
 	@echo "  make test-fr4     - Run with FR4 substrate"
 	@echo "  make test-air     - Run with air baseline"
 	@echo "  make test-rogers  - Run with Rogers material"
+	@echo "  make check-fasthenry - Cross-check R/L against FastHenry"
+	@echo "  make check-z0     - Sanity-check Z0 vs Hammerstad-Jensen"
 	@echo "  make install      - Install to /usr/local/bin"
 	@echo "  make tree         - Show project structure"
 	@echo "  make help         - Show this help"
@@ -158,4 +165,4 @@ tree:
 	@echo "│   └── test_rogers4003.yaml"
 	@echo "└── $(BUILD_DIR)/            (Build artifacts)"
 
-.PHONY: all clean distclean install uninstall test-fr4 test-air test-rogers check-fasthenry check-deps help tree
+.PHONY: all clean distclean install uninstall test-fr4 test-air test-rogers check-fasthenry check-z0 check-deps help tree
