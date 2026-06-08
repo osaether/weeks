@@ -135,7 +135,7 @@ conductors:
     
   - name: line1      # Signal trace; its y sets the substrate height (gap to ground)
     w: 150e-6
-    h: 18e-6
+    h: 35e-6         # 35 μm = 1 oz copper
     x: 600e-6
     y: 1.602e-3      # 1.6 mm above the ground-plane top => the substrate height
     nw: 21
