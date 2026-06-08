@@ -1,0 +1,32 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+weeks
+build_warnings.txt
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Runtime files
+test.line
+*.out
+*.log
+
+# Compiled Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution
+dist/
+*.tar.gz
+*.zip
+
+# Local session artifacts (not part of the project docs)
+docs/2026-06-03-error-review-session.md
+docs/2026-06-03-full-session-log.md
+docs/superpowers/

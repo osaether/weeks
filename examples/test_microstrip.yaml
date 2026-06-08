@@ -1,0 +1,38 @@
+# Microstrip example for the Z0 sanity check
+# (python3 -m tools.microstrip_z0 examples/test_microstrip.yaml).
+#
+# The substrate height is the trace-to-ground gap, derived from geometry: the
+# signal trace bottom sits at y = 202 um, the 2 um ground plane top at y = 2 um,
+# so the dielectric height is 200 um. weeks computes eff_er and L from this same
+# geometry, so its Z0 matches the Hammerstad-Jensen closed form to ~0.03%.
+#
+# The trace is deliberately thin (18 um) here: the check's H-J reference is
+# zero-thickness, so a thin trace isolates the inductance comparison. The
+# material examples (test_fr4, etc.) use 35 um (1 oz copper) for realism.
+
+frequency: 30e6  # 30 MHz
+
+conductors:
+  # Ground plane (line0)
+  - name: line0
+    w: 2800e-6
+    h: 2.0e-6
+    x: 0.0
+    y: 0.0
+    nw: 201
+    nh: 3
+    b: 0.2
+    er: 4.4
+    tan_delta: 0.02
+
+  # Signal trace; bottom at y = 202 um => 200 um above the ground-plane top
+  - name: line1
+    w: 150e-6
+    h: 18e-6
+    x: 1325e-6
+    y: 202e-6
+    nw: 21
+    nh: 7
+    b: 0.9
+    er: 4.4
+    tan_delta: 0.02
