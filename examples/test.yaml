@@ -21,7 +21,7 @@ conductors:
     w: 150e-6       # Width: 150μm
     h: 18e-6        # Thickness: 18μm
     x: 600e-6       # Position: 600μm
-    y: 77e-6        # Height above ground: 77μm
+    y: 1.602e-3     # 1.6 mm above the 2μm ground-plane top (= substrate height)
     nw: 21
     nh: 7
     b: 0.9
@@ -33,7 +33,7 @@ conductors:
     w: 150e-6
     h: 18e-6
     x: 825e-6
-    y: 77e-6
+    y: 1.602e-3
     nw: 21
     nh: 7
     b: 0.9
@@ -45,7 +45,7 @@ conductors:
     w: 150e-6
     h: 18e-6
     x: 1050e-6
-    y: 77e-6
+    y: 1.602e-3
     nw: 21
     nh: 7
     b: 0.9
