@@ -52,6 +52,7 @@ Done! 🎉
 - `test_air.yaml` - Air baseline
 - `test_fr4.yaml` - FR4 standard PCB
 - `test_rogers4003.yaml` - Rogers RO4003C
+- `test_microstrip.yaml` - Single trace for Z0 cross-check (`make check-z0`)
 - `test_single.yaml` - Single trace (used by `make check-fasthenry`)
 
 **To try different materials**:
