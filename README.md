@@ -369,7 +369,6 @@ weeks/
 ├── LICENSE                # MIT license
 ├── Makefile               # Build script
 ├── CLAUDE.md              # Guidance for AI coding assistants
-├── diagnostic_report.md   # PEEC vs FastHenry discretization analysis
 ├── test.yaml              # Active input file read by ./weeks
 │
 ├── src/                   # Source files (5 files, lowercase .c)
@@ -385,10 +384,11 @@ weeks/
 │   ├── calcl.h            # Calculator header
 │   └── lpp.h              # Partial inductance header
 │
-├── examples/              # YAML input examples (5 files)
+├── examples/              # YAML input examples (6 files)
 │   ├── test.yaml          # Default (FR4)
 │   ├── test_air.yaml      # Air baseline
 │   ├── test_fr4.yaml      # FR4 standard PCB
+│   ├── test_microstrip.yaml  # Single trace for Z0 cross-check
 │   ├── test_rogers4003.yaml  # Rogers RO4003C
 │   └── test_single.yaml   # Single trace (used by check-fasthenry)
 │
@@ -410,7 +410,7 @@ weeks/
 To validate results:
 
 1. **Compare against FastHenry**: Run `make check-fasthenry` for independent numerical validation of R/L values.
-2. **Mesh Alignment & Accuracy**: When both solvers use uniform meshes (by setting `b: 1.0` in `weeks` to match FastHenry's uniform sub-segmentation in the harness), they match to within **2.3%** across all self and mutual resistance/inductance terms. See [diagnostic_report.md](diagnostic_report.md) and [docs/fasthenry-crosscheck.md](docs/fasthenry-crosscheck.md) for details.
+2. **Mesh Alignment & Accuracy**: When both solvers use uniform meshes (by setting `b: 1.0` in `weeks` to match FastHenry's uniform sub-segmentation in the harness), they match to within **2.3%** across all self and mutual resistance/inductance terms. See [docs/fasthenry-crosscheck.md](docs/fasthenry-crosscheck.md) for details.
 3. **Online calculators**: Cross-check with analytical formulas.
 
 ## Troubleshooting
