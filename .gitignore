@@ -5,16 +5,8 @@ build/
 *.o
 *.a
 *.so
-*.exe
 weeks
 build_warnings.txt
-
-# Editor files
-*~
-*.swp
-*.swo
-.*.sw?
-*.bak
 
 # IDE files
 .vscode/
@@ -35,11 +27,3 @@ __pycache__/
 dist/
 *.tar.gz
 *.zip
-
-# Worktrees
-.worktrees/
-
-# Local session logs (kept locally, not published)
-docs/2026-06-03-error-review-session.md
-docs/2026-06-03-full-session-log.md
-docs/superpowers/
