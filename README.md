@@ -137,7 +137,7 @@ conductors:
     w: 150e-6
     h: 18e-6
     x: 600e-6
-    y: 202e-6        # 200 um above the ground-plane top => the substrate height
+    y: 1.602e-3      # 1.6 mm above the ground-plane top => the substrate height
     nw: 21
     nh: 7
     b: 0.9
