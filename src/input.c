@@ -24,18 +24,55 @@
 /* Global frequency variable */
 double global_frequency = 30e6;  /* Default 30 MHz */
 
-/* Helper function to get scalar value from YAML */
-static char* get_scalar_value(yaml_event_t *event) {
-    if (event->type != YAML_SCALAR_EVENT) {
+/* libyaml scalars have an explicit length and may contain embedded NULs.
+ * Reject those before treating keys or numeric values as C strings. */
+static const char *scalar_text(const yaml_node_t *node, const char *field) {
+    if (node->type != YAML_SCALAR_NODE ||
+        memchr(node->data.scalar.value, '\0', node->data.scalar.length) != NULL) {
+        fprintf(stderr, "ERROR: %s must be a scalar without NUL characters\n", field);
         return NULL;
     }
-    return strdup((char*)event->data.scalar.value);
+    return (const char *)node->data.scalar.value;
 }
 
-static int parse_number(const char *key, const char *str, double *result) {
+/* Validate only model mappings; unknown metadata values remain opaque. */
+static int validate_mapping(yaml_document_t *document, yaml_node_t *node,
+                            const char *context) {
+    yaml_node_pair_t *pair, *previous;
+    if (node == NULL || node->type != YAML_MAPPING_NODE) {
+        fprintf(stderr, "ERROR: %s must be a mapping\n", context);
+        return 0;
+    }
+    for (pair = node->data.mapping.pairs.start;
+         pair < node->data.mapping.pairs.top; pair++) {
+        const char *key = scalar_text(yaml_document_get_node(document, pair->key), "key");
+        if (key == NULL)
+            return 0;
+        /* The document loader resolves aliases, but does not apply YAML merge
+         * keys. Ignoring one could silently discard material/mesh settings. */
+        if (strcmp(key, "<<") == 0) {
+            fprintf(stderr, "ERROR: YAML merge keys (<<) are not supported in %s; "
+                            "use explicit fields or a direct alias\n", context);
+            return 0;
+        }
+        for (previous = node->data.mapping.pairs.start; previous < pair; previous++) {
+            yaml_node_t *old_key = yaml_document_get_node(document, previous->key);
+            if (strcmp(key, (const char *)old_key->data.scalar.value) == 0) {
+                fprintf(stderr, "ERROR: duplicate key '%s' in %s\n", key, context);
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+static int parse_number(const char *key, const yaml_node_t *node, double *result) {
+    const char *str = scalar_text(node, key);
     char *end;
     double value;
 
+    if (str == NULL)
+        return 0;
     errno = 0;
     value = strtod(str, &end);
     if (end == str)
@@ -52,7 +89,7 @@ invalid:
     return 0;
 }
 
-static int parse_conductor_value(conductor *c, const char *key, const char *value) {
+static int parse_conductor_value(conductor *c, const char *key, const yaml_node_t *value) {
     double *field = NULL;
     if (strcmp(key, "w") == 0) field = &c->w;
     else if (strcmp(key, "h") == 0) field = &c->h;
@@ -74,7 +111,7 @@ static int parse_conductor_value(conductor *c, const char *key, const char *valu
         /* Check before converting to int to avoid out-of-range casts. */
         if (divisions < 1 || divisions > limit || trunc(divisions) != divisions) {
             fprintf(stderr, "\n  ERROR: %s must be an integer in [1, %d] (got '%s')\n",
-                    key, limit, value);
+                    key, limit, (const char *)value->data.scalar.value);
             return 0;
         }
         if (width) c->nw = (int)divisions;
@@ -87,39 +124,12 @@ static int parse_conductor_value(conductor *c, const char *key, const char *valu
     return 1;
 }
 
-/* Skip unexpected nested structures */
-static int skip_node(yaml_parser_t *parser) {
-    yaml_event_t event;
-    int depth = 1;
-    
-    while (depth > 0) {
-        if (!yaml_parser_parse(parser, &event)) {
-            fprintf(stderr, "YAML parse error while skipping nested value\n");
-            return 0;
-        }
-        if (event.type == YAML_NO_EVENT || event.type == YAML_STREAM_END_EVENT) {
-            fprintf(stderr, "YAML parse error: unexpected end of nested value\n");
-            yaml_event_delete(&event);
-            return 0;
-        }
-        
-        if (event.type == YAML_MAPPING_START_EVENT || event.type == YAML_SEQUENCE_START_EVENT) {
-            depth++;
-        } else if (event.type == YAML_MAPPING_END_EVENT || event.type == YAML_SEQUENCE_END_EVENT) {
-            depth--;
-        }
-        
-        yaml_event_delete(&event);
-    }
-    
-    return 1;
-}
-
 /* Parse a conductor from YAML */
-static int parse_conductor(yaml_parser_t *parser, conductor *c) {
-    yaml_event_t event;
-    char *key = NULL;
-    int in_mapping = 1;
+static int parse_conductor(yaml_document_t *document, yaml_node_t *node, conductor *c) {
+    yaml_node_pair_t *pair;
+
+    if (!validate_mapping(document, node, "conductor"))
+        return 0;
     
     /* Set defaults */
     c->w = 0.0;
@@ -132,65 +142,13 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
     c->er = 1.0;
     c->tan_delta = 0.0;
     
-    while (in_mapping) {
-        if (!yaml_parser_parse(parser, &event)) {
-            fprintf(stderr, "YAML parse error\n");
-            free(key);
+    for (pair = node->data.mapping.pairs.start;
+         pair < node->data.mapping.pairs.top; pair++) {
+        yaml_node_t *key = yaml_document_get_node(document, pair->key);
+        yaml_node_t *value = yaml_document_get_node(document, pair->value);
+        if (!parse_conductor_value(c, (const char *)key->data.scalar.value, value))
             return 0;
-        }
-        
-        switch (event.type) {
-            case YAML_NO_EVENT:
-            case YAML_STREAM_END_EVENT:
-                fprintf(stderr, "YAML parse error: unexpected end of conductor\n");
-                free(key);
-                yaml_event_delete(&event);
-                return 0;
-
-            case YAML_MAPPING_END_EVENT:
-                in_mapping = 0;
-                break;
-                
-            case YAML_MAPPING_START_EVENT:
-            case YAML_SEQUENCE_START_EVENT:
-                if (!skip_node(parser)) {
-                    free(key);
-                    yaml_event_delete(&event);
-                    return 0;
-                }
-                free(key);
-                key = NULL;
-                break;
-                
-            case YAML_SCALAR_EVENT:
-                if (key == NULL) {
-                    /* This is a key */
-                    key = get_scalar_value(&event);
-                } else {
-                    /* This is a value */
-                    char *value = get_scalar_value(&event);
-                    
-                    if (!parse_conductor_value(c, key, value)) {
-                        free(value);
-                        free(key);
-                        yaml_event_delete(&event);
-                        return 0;
-                    }
-                    
-                    free(value);
-                    free(key);
-                    key = NULL;
-                }
-                break;
-                
-            default:
-                break;
-        }
-        
-        yaml_event_delete(&event);
     }
-    
-    free(key);
     
     /* Validate required fields */
     int ok = 1;
@@ -234,23 +192,19 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
 
 conductor *getinput(FILE *fp, int *n) {
     yaml_parser_t parser;
-    yaml_event_t event;
-    conductor *conductors;
+    yaml_document_t document, trailing;
+    yaml_node_t *root, *sequence = NULL;
+    yaml_node_pair_t *pair;
+    yaml_node_item_t *item;
+    conductor *conductors = NULL;
     int conductor_count = 0;
-    int in_conductors_sequence = 0;
-    int top_level_mapping_seen = 0;
-    char *key = NULL;
-    
-    conductors = (conductor *)malloc(sizeof(conductor) * MAX_CONDUCTORS);
-    if (conductors == NULL) {
-        fprintf(stderr, "Failed to allocate conductor array\n");
-        return NULL;
-    }
+    double frequency = 30e6;
+
+    *n = 0;
 
     /* Initialize parser */
     if (!yaml_parser_initialize(&parser)) {
         fprintf(stderr, "Failed to initialize YAML parser\n");
-        free(conductors);
         return NULL;
     }
     
@@ -258,123 +212,92 @@ conductor *getinput(FILE *fp, int *n) {
     
     fprintf(stderr, "\nParsing YAML input file...");
     
-    /* Parse YAML */
-    int done = 0;
-    while (!done) {
-        if (!yaml_parser_parse(&parser, &event)) {
-            fprintf(stderr, "YAML parse error at line %lu\n", parser.problem_mark.line);
-            free(key);
-            free(conductors);
-            yaml_parser_delete(&parser);
-            return NULL;
-        }
-        
-        switch (event.type) {
-            case YAML_NO_EVENT:
-                fprintf(stderr, "YAML parse error: no event available\n");
-                goto input_error;
-
-            case YAML_STREAM_END_EVENT:
-                done = 1;
-                break;
-                
-            case YAML_SCALAR_EVENT:
-                if (!in_conductors_sequence) {
-                    if (key == NULL) {
-                        key = get_scalar_value(&event);
-                    } else {
-                        /* Top-level key-value pair */
-                        char *value = get_scalar_value(&event);
-                        
-                        if (strcmp(key, "frequency") == 0) {
-                            if (!parse_number(key, value, &global_frequency)) {
-                                free(value);
-                                goto input_error;
-                            }
-                            fprintf(stderr, "\nFrequency: %.2e Hz (%.2f MHz)",
-                                    global_frequency, global_frequency/1e6);
-                        }
-                        
-                        free(value);
-                        free(key);
-                        key = NULL;
-                    }
-                }
-                break;
-                
-            case YAML_SEQUENCE_START_EVENT:
-                if (key && strcmp(key, "conductors") == 0) {
-                    in_conductors_sequence = 1;
-                    free(key);
-                    key = NULL;
-                } else {
-                    if (!skip_node(&parser))
-                        goto input_error;
-                    free(key);
-                    key = NULL;
-                }
-                break;
-                
-            case YAML_SEQUENCE_END_EVENT:
-                in_conductors_sequence = 0;
-                break;
-                
-            case YAML_MAPPING_START_EVENT:
-                if (in_conductors_sequence) {
-                    if (conductor_count < MAX_CONDUCTORS) {
-                        if (!parse_conductor(&parser, &conductors[conductor_count]))
-                            goto input_error;
-                        conductor_count++;
-                    } else {
-                        fprintf(stderr, "WARNING: conductor limit (%d) reached;"
-                                " extra conductors ignored\n", MAX_CONDUCTORS);
-                        if (!skip_node(&parser))
-                            goto input_error;
-                    }
-                } else if (!top_level_mapping_seen) {
-                    top_level_mapping_seen = 1;
-                } else {
-                    if (!skip_node(&parser))
-                        goto input_error;
-                    free(key);
-                    key = NULL;
-                }
-                break;
-                
-            default:
-                break;
-        }
-        
-        yaml_event_delete(&event);
-    }
-    
-    free(key);
-    yaml_parser_delete(&parser);
-
-    if (global_frequency <= 0.0) {
-        fprintf(stderr, "ERROR: frequency must be > 0 (got %g)\n", global_frequency);
-        free(conductors);
+    /* Load a document so keys and values cannot become desynchronized by
+     * collections or aliases. libyaml resolves aliases to document nodes. */
+    if (!yaml_parser_load(&parser, &document)) {
+        fprintf(stderr, "YAML parse error at line %zu: %s\n",
+                parser.problem_mark.line + 1, parser.problem);
+        yaml_parser_delete(&parser);
         return NULL;
     }
 
-    *n = conductor_count;
+    root = yaml_document_get_root_node(&document);
+    if (!validate_mapping(&document, root, "input root"))
+        goto input_error;
 
-    fprintf(stderr, "\n\nTotal conductors loaded: %d\n", conductor_count);
+    /* Consume the stream end as well: a second document or malformed trailing
+     * input must never be silently ignored. */
+    if (!yaml_parser_load(&parser, &trailing)) {
+        fprintf(stderr, "YAML parse error at line %zu: %s\n",
+                parser.problem_mark.line + 1, parser.problem);
+        goto input_error;
+    }
+    int has_trailing_document = yaml_document_get_root_node(&trailing) != NULL;
+    yaml_document_delete(&trailing);
+    if (has_trailing_document) {
+        fprintf(stderr, "ERROR: input must contain exactly one YAML document\n");
+        goto input_error;
+    }
+
+    for (pair = root->data.mapping.pairs.start;
+         pair < root->data.mapping.pairs.top; pair++) {
+        yaml_node_t *key_node = yaml_document_get_node(&document, pair->key);
+        const char *key = (const char *)key_node->data.scalar.value;
+        yaml_node_t *value = yaml_document_get_node(&document, pair->value);
+        if (strcmp(key, "frequency") == 0) {
+            if (!parse_number(key, value, &frequency))
+                goto input_error;
+        } else if (strcmp(key, "conductors") == 0) {
+            sequence = value;
+        }
+    }
+
+    if (frequency <= 0.0) {
+        fprintf(stderr, "ERROR: frequency must be > 0 (got %g)\n", frequency);
+        goto input_error;
+    }
+    if (sequence == NULL || sequence->type != YAML_SEQUENCE_NODE) {
+        fprintf(stderr, "ERROR: conductors must be a sequence of mappings\n");
+        goto input_error;
+    }
+    size_t count = sequence->data.sequence.items.top - sequence->data.sequence.items.start;
+    if (count > MAX_CONDUCTORS) {
+        fprintf(stderr, "ERROR: at most %d conductors are supported (got %zu); "
+                        "no conductors were loaded\n", MAX_CONDUCTORS, count);
+        goto input_error;
+    }
 
     /* Need at least a ground plane (line0) plus one signal trace. */
-    if (conductor_count < 2) {
+    if (count < 2) {
         fprintf(stderr, "ERROR: need at least 2 conductors (ground plane + "
-                        "1 signal trace), but %d were loaded.\n", conductor_count);
-        free(conductors);
-        return NULL;
+                        "1 signal trace), but %zu were supplied.\n", count);
+        goto input_error;
     }
 
+    conductors = malloc(sizeof(conductor) * count);
+    if (conductors == NULL) {
+        fprintf(stderr, "Failed to allocate conductor array\n");
+        goto input_error;
+    }
+    for (item = sequence->data.sequence.items.start;
+         item < sequence->data.sequence.items.top; item++) {
+        if (!parse_conductor(&document, yaml_document_get_node(&document, *item),
+                             &conductors[conductor_count]))
+            goto input_error;
+        conductor_count++;
+    }
+
+    global_frequency = frequency;
+    *n = conductor_count;
+    fprintf(stderr, "\nFrequency: %.2e Hz (%.2f MHz)", frequency, frequency/1e6);
+    fprintf(stderr, "\n\nTotal conductors loaded: %d\n", conductor_count);
+    yaml_document_delete(&document);
+    yaml_parser_delete(&parser);
     return conductors;
 
 input_error:
-    yaml_event_delete(&event);
-    free(key);
     free(conductors);
+    yaml_document_delete(&document);
     yaml_parser_delete(&parser);
     return NULL;
 }
