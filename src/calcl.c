@@ -37,8 +37,7 @@ double calc_eff_dielectric(double w, double h, double er)
   return eff_er;
 }
 
-/* Calculate dielectric loss contribution
- * Returns additional resistance per unit length due to dielectric loss
+/* Calculate dielectric attenuation in Np/m.
  */
 double calc_dielectric_loss(double er, double tan_delta, 
                             double Omega, double w, double h)
@@ -54,13 +53,12 @@ double calc_dielectric_loss(double er, double tan_delta,
   if (eff_er <= 1.0)
     return 0.0;
 
-  /* Dielectric loss: α_d = (π/λ) * (εr - 1)/(εeff - 1) * (εeff/εr) * tan(δ)
-   * where λ = 2πc/ω
-   * Converting to resistance per unit length
+  /* Microstrip dielectric attenuation, Qucs technical documentation Eq. 11.79:
+   * https://qucs.sourceforge.net/tech/node75.html
+   * α_d = (ω/(2c)) * (εr/√εeff) * ((εeff-1)/(εr-1)) * tan(δ).
    */
-  loss_per_length = (Omega * sqrt(eff_er) / c) *
-                    ((er - 1.0)/(eff_er - 1.0)) *
-                    (eff_er/er) * tan_delta;
+  loss_per_length = (Omega / (2.0 * c)) * (er / sqrt(eff_er)) *
+                    ((eff_er - 1.0)/(er - 1.0)) * tan_delta;
   
   return loss_per_length;
 }
@@ -189,6 +187,6 @@ void calc_line_params(ZMAT *z, double Omega, conductor *cond, int N)
            beta, eff_er_im);
   }
 
-  printf("\n  gamma = alpha + j*beta  (alpha = a column above in Np/m; beta in rad/m)\n");
+  printf("\n  gamma = alpha + j*beta  (alpha in Np/m = a(dB/m) / %.9f; beta in rad/m)\n", NP2DB);
   printf("  Complex effective permittivity per line: eff_er - j*eff_er''\n");
 }

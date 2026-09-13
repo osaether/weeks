@@ -61,8 +61,8 @@ make test-rogers  # Rogers RO4003C
 # Validate R/L against the FastHenry field solver (needs fasthenry on PATH)
 make check-fasthenry
 
-# Run the cross-check harness unit tests
-python3 -m pytest tools/fh_crosscheck/
+# Run all regression and cross-check harness tests
+python3 -m pytest -q
 ```
 
 ## Requirements
@@ -172,6 +172,10 @@ gap between the signal trace bottom and the ground-plane top. A legacy
 **IMPORTANT**: All dimensions must be in **METERS**!
 - 1.6 mm = **1.6e-3** meters (not 1.6!)
 - 150 μm = **150e-6** meters
+
+Numeric fields must be finite numbers without unit suffixes. Mesh divisions
+must be integers (`nw`: 1–1000, `nh`: 1–100), `er` must be at least 1,
+and `tan_delta` must be nonnegative. An invalid conductor aborts the calculation.
 
 ## Example Materials (YAML Format)
 
@@ -332,7 +336,7 @@ where F(w/h) is the Hammerstad-Jensen approximation and h is the substrate heigh
 The dielectric loss is reported as an attenuation constant α_d (units 1/m):
 
 ```
-α_d = (ω√εeff/c) × ((εr-1)/(εeff-1)) × (εeff/εr) × tan(δ)
+α_d = (ω/(2c)) × (εr/√εeff) × ((εeff-1)/(εr-1)) × tan(δ)
 ```
 
 It is **not** folded into the series R matrix (a 1/m attenuation cannot be added
@@ -493,4 +497,3 @@ Before opening an issue, it may help to:
 2. Verify the Meschach and libyaml installation (`make check-deps`)
 3. Compare against the provided `examples/`
 4. Validate with external tools (`make check-fasthenry`, online calculators)
-

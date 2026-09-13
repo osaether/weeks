@@ -27,6 +27,7 @@ SOURCES = $(SRC_DIR)/weeks.c \
 
 # Object files
 OBJECTS = $(SOURCES:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
+DEPS = $(OBJECTS:.o=.d)
 
 # Executable
 TARGET = weeks
@@ -57,8 +58,10 @@ $(TARGET): $(OBJECTS)
 	@echo ""
 
 # Compile source files
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
+
+-include $(DEPS)
 
 # Clean build artifacts
 clean:

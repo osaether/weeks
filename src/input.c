@@ -16,6 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <errno.h>
+#include <ctype.h>
 #include <yaml.h>
 #include "weeks.h"
 
@@ -30,8 +32,59 @@ static char* get_scalar_value(yaml_event_t *event) {
     return strdup((char*)event->data.scalar.value);
 }
 
-static double safe_atof(const char *str) {
-    return str ? atof(str) : 0.0;
+static int parse_number(const char *key, const char *str, double *result) {
+    char *end;
+    double value;
+
+    errno = 0;
+    value = strtod(str, &end);
+    if (end == str)
+        goto invalid;
+    while (isspace((unsigned char)*end))
+        end++;
+    if (*end != '\0' || errno == ERANGE || !isfinite(value))
+        goto invalid;
+    *result = value;
+    return 1;
+
+invalid:
+    fprintf(stderr, "\n  ERROR: %s must be a finite number (got '%s')\n", key, str);
+    return 0;
+}
+
+static int parse_conductor_value(conductor *c, const char *key, const char *value) {
+    double *field = NULL;
+    if (strcmp(key, "w") == 0) field = &c->w;
+    else if (strcmp(key, "h") == 0) field = &c->h;
+    else if (strcmp(key, "x") == 0) field = &c->x;
+    else if (strcmp(key, "y") == 0) field = &c->y;
+    else if (strcmp(key, "b") == 0) field = &c->b;
+    else if (strcmp(key, "er") == 0) field = &c->er;
+    else if (strcmp(key, "tan_delta") == 0) field = &c->tan_delta;
+
+    if (field != NULL)
+        return parse_number(key, value, field);
+
+    if (strcmp(key, "nw") == 0 || strcmp(key, "nh") == 0) {
+        double divisions;
+        int width = strcmp(key, "nw") == 0;
+        int limit = width ? 1000 : 100;
+        if (!parse_number(key, value, &divisions))
+            return 0;
+        /* Check before converting to int to avoid out-of-range casts. */
+        if (divisions < 1 || divisions > limit || trunc(divisions) != divisions) {
+            fprintf(stderr, "\n  ERROR: %s must be an integer in [1, %d] (got '%s')\n",
+                    key, limit, value);
+            return 0;
+        }
+        if (width) c->nw = (int)divisions;
+        else c->nh = (int)divisions;
+    } else if (strcmp(key, "substrate_h") == 0) {
+        fprintf(stderr, "\n  Note: 'substrate_h' is ignored; "
+                "substrate height is derived from geometry");
+    }
+    /* Names and unknown fields do not affect the calculation. */
+    return 1;
 }
 
 /* Skip unexpected nested structures */
@@ -100,32 +153,11 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
                     /* This is a value */
                     char *value = get_scalar_value(&event);
                     
-                    if (strcmp(key, "name") == 0) {
-                        /* Store name if needed */
-                    } else if (strcmp(key, "w") == 0) {
-                        c->w = safe_atof(value);
-                    } else if (strcmp(key, "h") == 0) {
-                        c->h = safe_atof(value);
-                    } else if (strcmp(key, "x") == 0) {
-                        c->x = safe_atof(value);
-                    } else if (strcmp(key, "y") == 0) {
-                        c->y = safe_atof(value);
-                    } else if (strcmp(key, "b") == 0) {
-                        c->b = safe_atof(value);
-                    } else if (strcmp(key, "nw") == 0) {
-                        c->nw = (int)round(safe_atof(value));
-                    } else if (strcmp(key, "nh") == 0) {
-                        c->nh = (int)round(safe_atof(value));
-                    } else if (strcmp(key, "er") == 0) {
-                        c->er = safe_atof(value);
-                    } else if (strcmp(key, "substrate_h") == 0) {
-                        /* Deprecated/ignored: the substrate height is derived
-                         * from the conductor geometry (trace-to-ground gap),
-                         * not read from the input. */
-                        fprintf(stderr, "\n  Note: 'substrate_h' is ignored; "
-                                "substrate height is derived from geometry");
-                    } else if (strcmp(key, "tan_delta") == 0) {
-                        c->tan_delta = safe_atof(value);
+                    if (!parse_conductor_value(c, key, value)) {
+                        free(value);
+                        free(key);
+                        yaml_event_delete(&event);
+                        return 0;
                     }
                     
                     free(value);
@@ -165,6 +197,12 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
     }
     if (c->b <= 0.0 || c->b > 1.0) {
         fprintf(stderr, "\n  ERROR: conductor b must be in (0, 1] (got %g)\n", c->b); ok = 0;
+    }
+    if (c->er < 1.0) {
+        fprintf(stderr, "\n  ERROR: conductor er must be >= 1 (got %g)\n", c->er); ok = 0;
+    }
+    if (c->tan_delta < 0.0) {
+        fprintf(stderr, "\n  ERROR: conductor tan_delta must be >= 0 (got %g)\n", c->tan_delta); ok = 0;
     }
     if (!ok)
         return 0;
@@ -228,7 +266,10 @@ conductor *getinput(FILE *fp, int *n) {
                         char *value = get_scalar_value(&event);
                         
                         if (strcmp(key, "frequency") == 0) {
-                            global_frequency = safe_atof(value);
+                            if (!parse_number(key, value, &global_frequency)) {
+                                free(value);
+                                goto input_error;
+                            }
                             fprintf(stderr, "\nFrequency: %.2e Hz (%.2f MHz)",
                                     global_frequency, global_frequency/1e6);
                         }
@@ -259,9 +300,9 @@ conductor *getinput(FILE *fp, int *n) {
             case YAML_MAPPING_START_EVENT:
                 if (in_conductors_sequence) {
                     if (conductor_count < MAX_CONDUCTORS) {
-                        if (parse_conductor(&parser, &conductors[conductor_count])) {
-                            conductor_count++;
-                        }
+                        if (!parse_conductor(&parser, &conductors[conductor_count]))
+                            goto input_error;
+                        conductor_count++;
                     } else {
                         fprintf(stderr, "WARNING: conductor limit (%d) reached;"
                                 " extra conductors ignored\n", MAX_CONDUCTORS);
@@ -305,4 +346,11 @@ conductor *getinput(FILE *fp, int *n) {
     }
 
     return conductors;
+
+input_error:
+    yaml_event_delete(&event);
+    free(key);
+    free(conductors);
+    yaml_parser_delete(&parser);
+    return NULL;
 }
