@@ -191,6 +191,14 @@ Numeric fields must be finite numbers without unit suffixes. Mesh divisions
 must be integers (`nw`: 1–1000, `nh`: 1–100), `er` must be at least 1,
 and `tan_delta` must be nonnegative. An invalid conductor aborts the calculation.
 
+Input must contain one YAML document with a mapping at its root and a
+`conductors` sequence of 2–10 mappings (ground first). Numeric fields must be
+scalars; lists or mappings are errors, even for optional fields. Duplicate keys
+in the root or conductor mappings and extra conductors abort the calculation.
+Unknown metadata values may be nested, and YAML aliases are resolved before
+validation. Merge keys (`<<`) are unsupported and rejected in model mappings.
+Omitting `frequency` defaults to 30 MHz.
+
 ## Example Materials (YAML Format)
 
 ### FR4 Standard PCB

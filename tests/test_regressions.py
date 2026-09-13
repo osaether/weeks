@@ -198,6 +198,93 @@ def test_valid_nested_metadata_is_skipped(run_weeks):
     line_parameters(result)
 
 
+@pytest.mark.parametrize("field", [
+    "w", "h", "x", "y", "nw", "nh", "b", "er", "tan_delta",
+])
+@pytest.mark.parametrize("value", ["[1]", "{value: 1}"])
+def test_numeric_conductor_fields_require_scalars(run_weeks, field, value):
+    signal = re.sub(r"\b%s: [^,}]+" % field, "%s: %s" % (field, value), SIGNAL)
+    result = run_weeks(case(conductors=(GROUND, signal)))
+    assert result.returncode > 0, result.stdout + result.stderr
+    assert field in result.stderr
+    assert "ERROR" in result.stderr
+    assert "RESULTS" not in result.stdout
+
+
+@pytest.mark.parametrize("yaml_text,message", [
+    ("", "mapping"),
+    ("plain text", "mapping"),
+    ("- " + case().replace("\n", "\n  "), "mapping"),
+    (case(frequency="[1e9]"), "frequency"),
+    (case(frequency="{value: 1e9}"), "frequency"),
+    ("conductors: {}", "conductors"),
+    ("conductors: invalid", "conductors"),
+    (case().replace("conductors:\n", "conductors:\n  - invalid\n"), "conductor"),
+    (case().replace("conductors:\n", "conductors:\n  - [invalid]\n"), "conductor"),
+    (case().replace("conductors:\n", "conductors:\n  - null\n"), "conductor"),
+    (case().replace("conductors:\n", "conductors:\n  - *undefined\n"), "YAML parse error"),
+    ("frequency: 1e9\n" + case(), "duplicate"),
+    (case() + "conductors: []\n", "duplicate"),
+    (case(conductors=(GROUND, SIGNAL[:-1] + ", er: 2}")), "duplicate"),
+    ("? [frequency]\n: 1e9\n" + case(), "key"),
+    (case(conductors=(GROUND, SIGNAL[:-1] + ", [er]: 2}")), "key"),
+    (case(frequency='"30e6\\0ignored"'), "frequency"),
+    (case().replace("frequency:", '"frequency\\0ignored":'), "key"),
+    (case() + "---\nfrequency: 1e9\n", "one YAML document"),
+    (case() + "---\n", "one YAML document"),
+    (case() + "---\nmetadata: [1,", "YAML parse error"),
+    (case() + "<<: {frequency: 1e9}\n", "merge keys"),
+    (case(conductors=(GROUND, SIGNAL[:-1] + ", <<: {er: 2}}")), "merge keys"),
+    ("conductors: &model [*model, *model]\n", "conductor"),
+])
+def test_invalid_yaml_structure_aborts_calculation(run_weeks, yaml_text, message):
+    result = run_weeks(yaml_text)
+    assert result.returncode > 0, result.stdout + result.stderr
+    assert message in result.stderr
+    assert "RESULTS" not in result.stdout
+
+
+@pytest.mark.parametrize("count", [10, 11])
+def test_conductor_limit_never_truncates_model(run_weeks, count):
+    signals = [SIGNAL.replace("y: 0.001", f"y: {0.001 * i}")
+               for i in range(1, count)]
+    result = run_weeks(case(conductors=(GROUND, *signals)))
+    if count == 10:
+        line_parameters(result)
+        assert "Total conductors loaded: 10" in result.stderr
+    else:
+        assert result.returncode > 0, result.stdout + result.stderr
+        assert "ERROR" in result.stderr
+        assert "10" in result.stderr
+        assert "RESULTS" not in result.stdout
+
+
+def test_yaml_aliases_preserve_frequency_and_conductors(run_weeks):
+    yaml_text = (
+        "metadata:\n  frequency: &freq 1e9\n  ground: &ground " + GROUND + "\n"
+        + case(frequency="*freq", conductors=("*ground", SIGNAL))
+    )
+    result = run_weeks(yaml_text)
+    expected = run_weeks(case(frequency="1e9"))
+    assert line_parameters(result) == line_parameters(expected)
+    assert "FREQUENCY: 1.000000e+09 Hz" in result.stdout
+
+
+def test_recursive_metadata_is_ignored_without_traversal(run_weeks):
+    result = run_weeks("metadata: &meta {self: *meta}\n" + case())
+    line_parameters(result)
+
+
+def test_omitted_frequency_and_dielectric_keep_defaults(run_weeks):
+    signal = SIGNAL.replace(", er: 4.4, tan_delta: 0.02", "")
+    yaml_text = case(conductors=(GROUND, signal)).split("\n", 1)[1]
+    result = run_weeks(yaml_text)
+    params = line_parameters(result)
+    assert "FREQUENCY: 3.000000e+07 Hz" in result.stdout
+    assert params["eff_er"] == 1
+    assert params["a_d"] == 0
+
+
 def test_explicit_input_path_preserves_default(built_project, tmp_path):
     default = tmp_path / "test.yaml"
     default.write_text("deliberately invalid default input")

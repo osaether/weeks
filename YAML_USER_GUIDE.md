@@ -67,6 +67,19 @@ conductors:
 - Start with `#` symbol
 - Can be on their own line or at end of line
 
+**Model validation:**
+- Supply exactly one YAML document whose root is a mapping.
+- `conductors` must be a list of 2–10 mappings, with the ground plane first.
+  Invalid entries and entries beyond the limit cause an error; none are skipped.
+- Numeric fields must be scalar numbers, including optional fields. For example,
+  `frequency: [1e9]` and `er: {value: 4.4}` are errors, not default values.
+- Keys in the root and each conductor mapping must be scalar strings and unique.
+- YAML aliases are resolved before validation. Unknown metadata values may be
+  nested and do not affect the calculation. Merge keys (`<<`) are unsupported
+  in model mappings; use explicit fields or alias a whole conductor mapping.
+- An omitted `frequency` defaults to 30 MHz; omitted `er` and `tan_delta` default
+  to air (`1.0` and `0.0`).
+
 ---
 
 ## Global Parameters
