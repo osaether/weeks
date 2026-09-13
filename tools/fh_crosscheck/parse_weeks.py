@@ -12,7 +12,6 @@ index followed by %+.4e floats. We detect data rows by the float format.
 
 import os
 import re
-import shutil
 import subprocess
 
 _ROW_INDEX = re.compile(r"^\d+$")
@@ -68,33 +67,16 @@ def parse_line_params(text):
 
 
 def run_weeks_text(case_yaml, weeks_bin="./weeks", workdir="."):
-    """Copy ``case_yaml`` to ``workdir/test.yaml``, run weeks, return stdout.
-
-    Any pre-existing test.yaml is backed up and restored (even on error).
-    """
-    test_yaml = os.path.join(workdir, "test.yaml")
-    backup = None
-    had_existing = os.path.exists(test_yaml)
-    if had_existing:
-        backup = test_yaml + ".xcbak"
-        shutil.copy2(test_yaml, backup)
-    try:
-        if os.path.abspath(case_yaml) != os.path.abspath(test_yaml):
-            shutil.copy2(case_yaml, test_yaml)
-        proc = subprocess.run(
-            [weeks_bin], cwd=workdir, capture_output=True, text=True,
-            timeout=120
+    """Run weeks on ``case_yaml`` (relative to the caller), returning stdout."""
+    proc = subprocess.run(
+        [weeks_bin, os.path.abspath(case_yaml)],
+        cwd=workdir, capture_output=True, text=True, timeout=120
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            "weeks exited %d.\nstderr:\n%s" % (proc.returncode, proc.stderr)
         )
-        if proc.returncode != 0:
-            raise RuntimeError(
-                "weeks exited %d.\nstderr:\n%s" % (proc.returncode, proc.stderr)
-            )
-        return proc.stdout
-    finally:
-        if backup:
-            shutil.move(backup, test_yaml)
-        elif os.path.exists(test_yaml):
-            os.remove(test_yaml)
+    return proc.stdout
 
 
 def run_weeks(case_yaml, weeks_bin="./weeks", workdir="."):

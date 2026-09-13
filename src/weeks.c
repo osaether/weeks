@@ -2,6 +2,7 @@
 #include <time.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include "machine.h"
 #include "zmatrix2.h"
 #include "weeks.h"
@@ -13,7 +14,7 @@ extern double global_frequency;
 #define PI 3.141592653589793116
 #endif
 
-int main(void)
+int main(int argc, char **argv)
 {
   int i, j, k, m;
   conductor *test;
@@ -24,6 +25,16 @@ int main(void)
   double f, Omega;
   ZMAT *Z=ZMNULL, *Y=ZMNULL, *z=ZMNULL,*y=ZMNULL;
   FILE *fp;
+  const char *filename = (argc > 1) ? argv[1] : "test.yaml";
+
+  if (argc == 2 && (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0)) {
+    printf("Usage: %s [input.yaml]\nDefault input: test.yaml\n", argv[0]);
+    return EXIT_SUCCESS;
+  }
+  if (argc > 2) {
+    fprintf(stderr, "Usage: %s [input.yaml]\n", argv[0]);
+    return EXIT_FAILURE;
+  }
   
   fprintf(stderr, "\n========================================\n");
   fprintf(stderr, "Microstrip Resistance Calculator\n");
@@ -35,9 +46,9 @@ int main(void)
   setbuf(stdout, (char *)NULL);
   setbuf(stderr, (char *)NULL);
 
-  if ((fp = fopen("test.yaml", "r")) == NULL)
+  if ((fp = fopen(filename, "r")) == NULL)
     {
-      fprintf(stderr, "ERROR: Cannot open input file '%s'\n", "test.yaml");
+      fprintf(stderr, "ERROR: Cannot open input file '%s'\n", filename);
       fprintf(stderr, "Please create a YAML input file with conductor definitions.\n");
       exit(EXIT_FAILURE);
     }
@@ -58,6 +69,10 @@ int main(void)
   fprintf(stderr, "\n\nBuilding partial elements...");
 
   n0 = M = test[0].nw*test[0].nh-1;
+  if (n0 == 0)
+    fprintf(stderr, "\n  Warning: ground plane has only one element; current"
+            " redistribution within the ground cannot be resolved. Refine the"
+            " ground mesh and check convergence.\n");
   for(i=1;i<=N;i++)
     M += test[i].nw*test[i].nh;
   e = build_elements(M, N, test, &e0);

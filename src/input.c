@@ -94,6 +94,12 @@ static int skip_node(yaml_parser_t *parser) {
     
     while (depth > 0) {
         if (!yaml_parser_parse(parser, &event)) {
+            fprintf(stderr, "YAML parse error while skipping nested value\n");
+            return 0;
+        }
+        if (event.type == YAML_NO_EVENT || event.type == YAML_STREAM_END_EVENT) {
+            fprintf(stderr, "YAML parse error: unexpected end of nested value\n");
+            yaml_event_delete(&event);
             return 0;
         }
         
@@ -134,13 +140,24 @@ static int parse_conductor(yaml_parser_t *parser, conductor *c) {
         }
         
         switch (event.type) {
+            case YAML_NO_EVENT:
+            case YAML_STREAM_END_EVENT:
+                fprintf(stderr, "YAML parse error: unexpected end of conductor\n");
+                free(key);
+                yaml_event_delete(&event);
+                return 0;
+
             case YAML_MAPPING_END_EVENT:
                 in_mapping = 0;
                 break;
                 
             case YAML_MAPPING_START_EVENT:
             case YAML_SEQUENCE_START_EVENT:
-                skip_node(parser);
+                if (!skip_node(parser)) {
+                    free(key);
+                    yaml_event_delete(&event);
+                    return 0;
+                }
                 free(key);
                 key = NULL;
                 break;
@@ -253,6 +270,10 @@ conductor *getinput(FILE *fp, int *n) {
         }
         
         switch (event.type) {
+            case YAML_NO_EVENT:
+                fprintf(stderr, "YAML parse error: no event available\n");
+                goto input_error;
+
             case YAML_STREAM_END_EVENT:
                 done = 1;
                 break;
@@ -287,7 +308,8 @@ conductor *getinput(FILE *fp, int *n) {
                     free(key);
                     key = NULL;
                 } else {
-                    skip_node(&parser);
+                    if (!skip_node(&parser))
+                        goto input_error;
                     free(key);
                     key = NULL;
                 }
@@ -306,12 +328,14 @@ conductor *getinput(FILE *fp, int *n) {
                     } else {
                         fprintf(stderr, "WARNING: conductor limit (%d) reached;"
                                 " extra conductors ignored\n", MAX_CONDUCTORS);
-                        skip_node(&parser);
+                        if (!skip_node(&parser))
+                            goto input_error;
                     }
                 } else if (!top_level_mapping_seen) {
                     top_level_mapping_seen = 1;
                 } else {
-                    skip_node(&parser);
+                    if (!skip_node(&parser))
+                        goto input_error;
                     free(key);
                     key = NULL;
                 }

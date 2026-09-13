@@ -50,8 +50,11 @@ make check-deps
 # Build
 make
 
-# Run with FR4 (default)
+# Run using test.yaml
 ./weeks
+
+# Or specify an input file
+./weeks examples/test_fr4.yaml
 
 # Or test with different materials
 make test-fr4     # FR4 substrate
@@ -64,6 +67,17 @@ make check-fasthenry
 # Run all regression and cross-check harness tests
 python3 -m pytest -q
 ```
+
+Usage: `./weeks [input.yaml]` (default: `test.yaml`). Use `./weeks --help`
+for usage information. The example targets read their input files directly.
+
+For graded signal meshes (`b < 1`), use odd `nw` and `nh` to preserve
+symmetry; uniform meshes (`b = 1`) also support even divisions. A ground plane
+with only one element includes its resistance and inductance, but cannot
+resolve current redistribution within the ground. Refine both signal and ground
+meshes until the results converge; no fixed element count guarantees accuracy.
+The per-line transmission-line estimates treat each signal in isolation and
+omit inter-line capacitive coupling.
 
 ## Requirements
 
@@ -372,7 +386,7 @@ weeks/
 ├── LICENSE                # MIT license
 ├── Makefile               # Build script
 ├── CLAUDE.md              # Guidance for AI coding assistants
-├── test.yaml              # Active input file read by ./weeks
+├── test.yaml              # Default input file when no filename is supplied
 │
 ├── src/                   # Source files (5 files, lowercase .c)
 │   ├── weeks.c            # Main program (with YAML support)

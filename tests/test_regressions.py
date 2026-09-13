@@ -11,6 +11,8 @@ import subprocess
 
 import pytest
 
+from tools.fh_crosscheck.parse_weeks import run_weeks_text
+
 
 GROUND = "{w: 0.01, h: 0.000035, nw: 3, nh: 1, b: 1}"
 SIGNAL = (
@@ -172,3 +174,93 @@ def test_gamma_conversion_from_db_to_np_is_correct(run_weeks):
     conversion = re.search(r"alpha in Np/m = a\(dB/m\) / ([0-9.]+)", result.stdout)
     assert conversion, "Output must explain how to convert attenuation for gamma"
     assert float(conversion.group(1)) == pytest.approx(20 / math.log(10), rel=1e-9)
+
+
+@pytest.mark.parametrize("yaml_text", [
+    "conductors:\n  - {w: 1",
+    "metadata: [1, 2",
+    "metadata: {nested: [1, 2",
+    "conductors:\n  - w: 1\n    metadata: [1, 2",
+    case(conductors=(GROUND,) * 10) + "  - {metadata: [1, 2",
+])
+def test_truncated_yaml_exits_with_error(run_weeks, yaml_text):
+    # Covers conductor parsing and every caller that skips nested YAML.
+    # The subprocess timeout in run_weeks catches the former infinite loops.
+    result = run_weeks(yaml_text)
+    assert result.returncode > 0
+    assert "YAML parse error" in result.stderr
+    assert "RESISTANCE MATRIX" not in result.stdout
+
+
+def test_valid_nested_metadata_is_skipped(run_weeks):
+    signal = SIGNAL[:-1] + ", metadata: {nested: [1, {label: sample}]}}"
+    result = run_weeks("metadata: {nested: [1, 2]}\n" + case(conductors=(GROUND, signal)))
+    line_parameters(result)
+
+
+def test_explicit_input_path_preserves_default(built_project, tmp_path):
+    default = tmp_path / "test.yaml"
+    default.write_text("deliberately invalid default input")
+    selected = tmp_path / "selected input.yaml"
+    selected.write_text(case(frequency="1e6"))
+    result = subprocess.run(
+        [str(built_project / "weeks"), selected.name], cwd=tmp_path,
+        capture_output=True, text=True, timeout=10,
+    )
+    line_parameters(result)
+    assert "FREQUENCY: 1.000000e+06 Hz" in result.stdout
+    assert default.read_text() == "deliberately invalid default input"
+
+
+@pytest.mark.parametrize("arguments,code,message", [
+    (["--help"], 0, "Usage:"),
+    (["-h"], 0, "Usage:"),
+    (["one.yaml", "two.yaml"], 1, "Usage:"),
+    (["missing.yaml"], 1, "Cannot open input file 'missing.yaml'"),
+])
+def test_cli_diagnostics(built_project, tmp_path, arguments, code, message):
+    result = subprocess.run(
+        [str(built_project / "weeks"), *arguments], cwd=tmp_path,
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == code
+    assert message in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("nw,nh,b,warn", [
+    (4, 1, 1, False), (3, 2, 1, False),
+    (4, 1, 0.5, True), (3, 2, 0.5, True), (3, 3, 0.5, False),
+])
+def test_mesh_symmetry_warning(run_weeks, nw, nh, b, warn):
+    signal = SIGNAL.replace("nw: 3, nh: 1, b: 1", f"nw: {nw}, nh: {nh}, b: {b}")
+    result = run_weeks(case(conductors=(GROUND, signal)))
+    line_parameters(result)
+    assert ("graded mesh is only symmetric" in result.stderr) == warn
+
+
+@pytest.mark.parametrize("nw,warn", [(1, True), (3, False)])
+def test_single_ground_element_warning(run_weeks, nw, warn):
+    ground = GROUND.replace("nw: 3", f"nw: {nw}")
+    result = run_weeks(case(conductors=(ground, SIGNAL)))
+    line_parameters(result)
+    assert ("ground plane has only one element" in result.stderr) == warn
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_crosscheck_runner_preserves_workdir_input(built_project, tmp_path, valid):
+    workdir = tmp_path / "work"
+    workdir.mkdir()
+    default = workdir / "test.yaml"
+    default.write_text("existing input")
+    backup = workdir / "test.yaml.xcbak"
+    backup.write_text("existing backup")
+    selected = tmp_path / "selected input.yaml"
+    selected.write_text(case() if valid else "metadata: [1, 2")
+    if valid:
+        output = run_weeks_text(selected, str(built_project / "weeks"), workdir)
+        assert "RESISTANCE MATRIX" in output
+    else:
+        with pytest.raises(RuntimeError, match="YAML parse error"):
+            run_weeks_text(selected, str(built_project / "weeks"), workdir)
+    assert default.read_text() == "existing input"
+    assert backup.read_text() == "existing backup"
