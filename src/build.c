@@ -48,7 +48,7 @@ element *build_elements (int M, int N, conductor *test, element *e0)
         {
           nh2 = test[i].nh/2;
           nw2 = test[i].nw/2;
-          if (test[i].nw % 2 == 0 || test[i].nh % 2 == 0)
+          if (test[i].b < 1.0 && (test[i].nw % 2 == 0 || test[i].nh % 2 == 0))
             fprintf(stderr, "\n  Warning: conductor %d has even nw=%d or nh=%d;"
                     " graded mesh is only symmetric for odd values\n",
                     i, test[i].nw, test[i].nh);

@@ -994,8 +994,7 @@ y: 2.402e-3
 Then run all:
 ```bash
 for f in test_*.yaml; do
-    cp $f test.yaml
-    ./weeks > results_$(basename $f .yaml).txt
+    ./weeks "$f" > "results_$(basename "$f" .yaml).txt"
 done
 ```
 

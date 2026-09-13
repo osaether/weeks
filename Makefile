@@ -46,9 +46,9 @@ $(TARGET): $(OBJECTS)
 	@echo "========================================"
 	@echo "Build complete: $(TARGET)"
 	@echo "========================================"
-	@echo "Run with: ./$(TARGET)"
+	@echo "Run with: ./$(TARGET) [input.yaml]"
 	@echo ""
-	@echo "Input file: test.yaml (YAML format)"
+	@echo "Default input file: test.yaml (YAML format)"
 	@echo "Example files in $(EXAMPLE_DIR)/"
 	@echo ""
 	@echo "To run examples:"
@@ -86,20 +86,17 @@ uninstall:
 # Run with FR4
 test-fr4: $(TARGET)
 	@echo "Running with FR4 substrate..."
-	@cp $(EXAMPLE_DIR)/test_fr4.yaml test.yaml
-	./$(TARGET)
+	./$(TARGET) $(EXAMPLE_DIR)/test_fr4.yaml
 
 # Run with air
 test-air: $(TARGET)
 	@echo "Running with air (baseline)..."
-	@cp $(EXAMPLE_DIR)/test_air.yaml test.yaml
-	./$(TARGET)
+	./$(TARGET) $(EXAMPLE_DIR)/test_air.yaml
 
 # Run with Rogers
 test-rogers: $(TARGET)
 	@echo "Running with Rogers RO4003C substrate..."
-	@cp $(EXAMPLE_DIR)/test_rogers4003.yaml test.yaml
-	./$(TARGET)
+	./$(TARGET) $(EXAMPLE_DIR)/test_rogers4003.yaml
 
 # Cross-check weeks R/L against FastHenry
 check-fasthenry: $(TARGET)
