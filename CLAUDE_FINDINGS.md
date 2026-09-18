@@ -29,13 +29,19 @@ difference `lp(a,b) − lp(a,c)` must equal the thin-filament value
 | 10⁵ | 0.0 | total loss |
 | 10⁶ | −23.1 | garbage |
 
-The shipped examples sit at the edge of this regime: the ground plane is
-2 µm/3 = 0.67 µm thick per element and 2.8 mm wide, so d/s ≈ 4·10³ across the
-plane, and the far mutual terms carry ~0.1–0.3 % error (checked against the
-filament formula at 2.0 mm vs 2.8 mm: 6.743e-8 vs 6.729e-8). The input limits
-allow `nh: 100`, i.e. 20 nm ground elements and d/s ≈ 10⁵, so a user who
-"refines the ground mesh and checks convergence" — which `weeks.c:73` tells them
-to do — will get a matrix filled with noise, with no warning.
+The harness uses square elements; for a `w × h` element the cancellation error
+scales as `ε·d⁴/(w²·h²)`, so the thin dimension dominates. The shipped examples
+sit at the edge of this regime: the ground plane is 2 µm/3 = 0.67 µm thick per
+element and 2.8 mm wide, so d/h ≈ 4·10³ across the plane. The far mutual
+*differences* carry ~0.1–0.3 % error (checked against the filament formula at
+2.0 mm vs 2.8 mm: 6.743e-8 vs 6.729e-8), which is ~1e-4 of each `lp` entry and
+about the same on the final reference-subtracted L — the examples are fine.
+The risk is refinement: the input limits allow `nh: 100`, i.e. 20 nm-tall
+ground elements (width unchanged at ~4.7 µm), which puts the error at ~1–2 %
+of each entry and tens of percent on the loop terms after reference
+subtraction. A user who "refines the ground mesh and checks convergence" —
+which `weeks.c:73` tells them to do — will therefore see results *diverge*
+with refinement, with no warning.
 
 Making `F()` compute in `long double` (the code already calls `logl`/`atanl`
 but throws the extra bits away by returning `double`) only moves the breakdown
@@ -69,12 +75,17 @@ R = 9.5 Ω/m against ωL = 0.036 Ω/m, so a real-valued `Z0 = √(L/C)` is not
 defined at all — the printed 97.7 Ω is an artefact. The `check-z0` harness only
 runs at 30 MHz for an 18 µm trace, where this is masked.
 
-Fix: compute C once from the *external* (skin-limit) inductance — e.g. run the
-inductance fill with the reference solution at a very high frequency, or use
-`εeff/(c²·L∞)` — and report `Z0 = √((R + jωL)/(jωC))` as a complex number (or
-at least print |Z0| and its phase and label the real-Z0 column as the lossless
-high-frequency limit). Add a test asserting C is frequency-independent to
-within the mesh tolerance.
+Fix: compute C once from a *static* source that does not depend on the
+frequency-swept PEEC inductance. Do **not** obtain it by re-running the PEEC
+fill at a very high frequency: finding 3 shows the same mesh is skin-depth
+limited there, so an "L∞" from the volume mesh would be mesh-limited too. Two
+consistent options are (a) take C from the Hammerstad-Jensen closed form the
+code already implements (H-J gives Z0 and εeff, hence `C = √εeff/(c·Z0)`), or
+(b) a separate PEC/surface-current solve for the external inductance. Then
+report `Z0 = √((R + jωL)/(jωC))` as a complex number (or at least print |Z0|
+and its phase and label the real-Z0 column as the lossless high-frequency
+limit). Add a test asserting C is frequency-independent to within the mesh
+tolerance.
 
 ## 3. [robustness] No skin-depth check: R is silently mesh-limited at high frequency
 
@@ -91,7 +102,11 @@ mentions skin depth. Same microstrip example, trace mesh only changed:
 | 10 GHz | `nw:41 nh:21 b:0.3` | **116.7 (+91 %)** |
 
 The shipped mesh under-predicts conductor loss by ~2× at 10 GHz and prints no
-diagnostic. Add a warning in `build_elements()` (or after the fill) when the
+diagnostic. Caveat: the refined-mesh figures are not converged values — the
+`b: 0.3` trace mesh has ~0.4 µm elements at up to 2.8 mm range (d/h ≈ 7·10³),
+so they carry some of the cancellation error from finding 1. The conclusion
+(shipped mesh is mesh-limited by ~2× at 10 GHz) stands; the exact refined
+number should not be quoted. Add a warning in `build_elements()` (or after the fill) when the
 smallest element dimension of any conductor exceeds ~δ/2, naming the conductor
 and the ratio; optionally refuse when it exceeds ~2δ. Document the rule in
 `YAML_USER_GUIDE.md` next to the mesh parameters.
@@ -174,13 +189,16 @@ need the same corrections to stay an independent reference.
 
 `examples/test_fr4.yaml` (M = 1043) takes 1.7 s wall — roughly 1 s in
 `calcl()` and 0.7 s in `zm_inverse()`. Both scale badly and the input limits
-(`nw ≤ 1000`, `nh ≤ 100`, 10 conductors) permit M ≈ 10⁶, i.e. a 16 TB matrix,
-with no estimate or refusal before `zm_get()` aborts.
+(`nw ≤ 1000`, `nh ≤ 100`, 10 conductors) permit M ≈ 10⁶, i.e. 16 TB per
+matrix — 32 TB for the two the current code holds — with no estimate or
+refusal before `zm_get()` aborts.
 
 - `weeks.c` computes the full inverse `Y = Z⁻¹` (LU + M triangular solves) but
   only uses block sums of N ≤ 9 column groups. Solving `Z·X = B` for N
   indicator columns (`zLUfactor` + N `zLUsolve`, both exported by Meschach) gives
-  identical `y` at ~¼ the cost and halves peak memory (no second M×M result).
+  identical `y` at ~¼ the cost *of the inversion step* and halves peak memory
+  (no second M×M result). On its own that is ~0.7 s → ~0.2 s here, i.e. ~30 %
+  of wall time; the 4× only materialises once the fill is also sped up.
 - `calcl()` evaluates `lp(&e[i], &e0)` inside the `i` loop although the same
   value is already in `lpj->ve[i]` (symmetry), and each `lp()` call does 16
   `F()` evaluations with three transcendental calls each. A far-field branch
@@ -205,9 +223,10 @@ same σ on both sides.
 
 1. Findings 4 and 5 (input validation) — small, isolated, immediately testable
    with the existing `tests/test_regressions.py` pattern.
-2. Finding 3 (skin-depth warning) — small, prevents the most common misuse.
-3. Finding 1 (far-field `lp`) — needs a numerical test; unblocks mesh
-   refinement.
+2. Finding 1 (far-field `lp`) — needs a numerical test; must land before
+   users are told to refine meshes, otherwise the convergence checks that
+   finding 3 asks for will diverge.
+3. Finding 3 (skin-depth warning) — small, prevents the most common misuse.
 4. Finding 2 (static C, complex Z0) — changes output format; coordinate with
    `tools/microstrip_z0` and the regression tests that parse the TL table.
 5. Findings 6, 7, 9 (input model) — YAML format changes; do together so the
