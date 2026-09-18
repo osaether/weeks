@@ -1,9 +1,10 @@
 # CLAUDE_FINDINGS.md
 
 Deep-analysis findings for the `weeks` PEEC calculator, 2026-09-18, against
-`main` at `d8b7bf7`. Every numerical claim below was reproduced by running the
-built binary or a small C harness against `src/lpp.c`; the commands are given so
-they can be re-run. Ordered by severity.
+`main` at `d8b7bf7`. The tables in findings 1–3 report diagnostic runs, not
+converged reference solutions; reproduction commands are included below. Other numerical error
+bounds and performance projections are estimates requiring separate validation.
+Ordered by severity.
 
 Legend: **[bug]** wrong or misleading output · **[robustness]** silent bad input ·
 **[model]** physics limitation worth documenting or fixing · **[perf]** scaling.
@@ -13,12 +14,12 @@ Legend: **[bug]** wrong or misleading output · **[robustness]** silent bad inpu
 ## 1. [bug] `lp()` loses all precision for well-separated elements
 
 `src/lpp.c` evaluates Weeks' closed form as a signed sum of 16 `F()` terms of
-magnitude ~`d²·ln d / (area₁·area₂)`, which cancel down to a result of order
+magnitude ~`d⁴·ln d / (area₁·area₂)`, which cancel down to a result of order
 `1e-6`. Once an element's separation `d` exceeds ~10³× its smallest side, the
 cancellation exhausts double precision.
 
 Harness (`element a` of side `s = 1 µm`, elements `b`, `c` at `d` and `2d`; the
-difference `lp(a,b) − lp(a,c)` must equal the thin-filament value
+difference `lp(a,b) − lp(a,c)` approaches the thin-filament value
 `2e-7·ln 2 = 1.3863e-7`):
 
 | d/s | `lp(a,b) − lp(a,c)` | rel. error |
@@ -35,7 +36,8 @@ sit at the edge of this regime: the ground plane is 2 µm/3 = 0.67 µm thick per
 element and 2.8 mm wide, so d/h ≈ 4·10³ across the plane. The far mutual
 *differences* carry ~0.1–0.3 % error (checked against the filament formula at
 2.0 mm vs 2.8 mm: 6.743e-8 vs 6.729e-8), which is ~1e-4 of each `lp` entry and
-about the same on the final reference-subtracted L — the examples are fine.
+does not establish an error bound on the final reference-subtracted L. That
+requires a stable reference calculation and a check of solver conditioning.
 The risk is refinement: the input limits allow `nh: 100`, i.e. 20 nm-tall
 ground elements (width unchanged at ~4.7 µm), which puts the error at ~1–2 %
 of each entry and tens of percent on the loop terms after reference
@@ -45,14 +47,25 @@ with refinement, with no warning.
 
 Making `F()` compute in `long double` (the code already calls `logl`/`atanl`
 but throws the extra bits away by returning `double`) only moves the breakdown
-from d/s ≈ 10³ to ≈ 10⁴. The real fix is a far-field branch: for
-d/s above ~50–100, replace the closed form with the filament/multipole
-expansion `−2e-7·ln(d_centroid) + O((s/d)²)` (this is what FastHenry does).
-Add a regression test that compares `lp` differences to the filament limit
-across the d/s range above.
+from d/s ≈ 10³ to ≈ 10⁴. A candidate fix is a far-field branch using the
+filament limit `−2e-7·ln(d_centroid)` with multipole corrections. Its acceptance
+criterion must use the largest extent of **both** elements relative to their
+centroid separation, not the smallest side used to illustrate cancellation.
+A thin, wide element can have large d/min(w,h) without being in the far field.
+Choose the expansion order and switching threshold from a validated error
+bound; retain a stable near-field calculation for pairs that fail the criterion.
+Test square, elongated and unequal elements, including the switching boundary,
+against a high-precision integral/reference and the far-field limit.
 
-Repro: `gcc -O2 -Iinclude lptest.c src/lpp.c -lm` with the harness in this
-session's scratchpad (`lptest.c`, 20 lines).
+Reproduce the square-element table from the repository root (GCC and libm only):
+
+```sh
+gcc -O2 -Iinclude tools/lptest.c src/lpp.c -lm -o /tmp/weeks-lptest
+/tmp/weeks-lptest
+```
+
+The harness prints diagnostics, not pass/fail assertions. Cancellation results
+may vary with compiler and floating-point implementation.
 
 ## 2. [bug] Transmission-line C and Z0 are frequency-dependent and meaningless below the skin-effect regime
 
@@ -71,9 +84,9 @@ swept over `frequency:`:
 | 1e10 | 61.0 | 4.53e-7 | **77.0** | **7.64e-11** |
 
 C changes by 27 % and Z0 by 27 % for the same geometry. At 10 kHz the line has
-R = 9.5 Ω/m against ωL = 0.036 Ω/m, so a real-valued `Z0 = √(L/C)` is not
-defined at all — the printed 97.7 Ω is an artefact. The `check-z0` harness only
-runs at 30 MHz for an 18 µm trace, where this is masked.
+R = 9.5 Ω/m against ωL = 0.036 Ω/m, so the real-valued `Z0 = √(L/C)` is a
+low-loss approximation outside its validity range, not the physical characteristic
+impedance. The `check-z0` harness only runs at 30 MHz for an 18 µm trace, where this is masked.
 
 Fix: compute C once from a *static* source that does not depend on the
 frequency-swept PEEC inductance. Do **not** obtain it by re-running the PEEC
@@ -82,17 +95,38 @@ limited there, so an "L∞" from the volume mesh would be mesh-limited too. Two
 consistent options are (a) take C from the Hammerstad-Jensen closed form the
 code already implements (H-J gives Z0 and εeff, hence `C = √εeff/(c·Z0)`), or
 (b) a separate PEC/surface-current solve for the external inductance. Then
-report `Z0 = √((R + jωL)/(jωC))` as a complex number (or at least print |Z0|
-and its phase and label the real-Z0 column as the lossless high-frequency
-limit). Add a test asserting C is frequency-independent to within the mesh
-tolerance.
+report `Z0 = √((R + jωL)/(G + jωC))` and compute attenuation and phase from
+`γ = √((R + jωL)(G + jωC))`, choosing the passive propagation branch. Include
+shunt dielectric conductance `G = ωC·tanδ_eff`, consistent with the effective
+dielectric loss model; omitting G is only appropriate for a lossless dielectric.
+The existing `R/(2Z0)` attenuation and `ω√εeff/c` phase formulas must also be
+replaced when reporting a general lossy-line solution. See the
+[Qucs transmission-line equations](https://qucs.sourceforge.net/tech/node4.html).
+Print complex Z0 (or magnitude and phase), and label any retained real-Z0 column
+as a lossless approximation. Test frequency-independent C under the static,
+nondispersive assumption, the lossless limit, nonzero dielectric loss, and the
+low-frequency regime where R dominates ωL.
+
+Reproduce the frequency table and finding 3's mesh comparison from the repository
+root (build dependencies plus Python's standard library):
+
+```sh
+make
+python3 -m tools.reproduce_findings
+```
+
+Inputs are generated in a temporary directory from `examples/test_microstrip.yaml`;
+the script leaves the example unchanged and prints values at the binary's output
+precision.
 
 ## 3. [robustness] No skin-depth check: R is silently mesh-limited at high frequency
 
-Weeks' method requires element cross-sections smaller than the skin depth
+Resolving skin effect requires adequate surface-normal mesh resolution relative
+to the skin depth
 `δ = √(2/(ωμσ))` (0.66 µm in copper at 10 GHz, 2.1 µm at 1 GHz). Nothing in
-`build.c`/`weeks.c` compares element size to δ, and no document in the repo
-mentions skin depth. Same microstrip example, trace mesh only changed:
+`build.c`/`weeks.c` compares element size to δ. The FastHenry input generator
+mentions skin depth, but the calculator provides no such diagnostic. Same
+microstrip example, trace mesh only changed:
 
 | f | trace mesh | R (Ω/m) |
 |---|------------|---------|
@@ -101,15 +135,21 @@ mentions skin depth. Same microstrip example, trace mesh only changed:
 | 10 GHz | `nw:21 nh:7 b:0.9` (shipped) | 61.0 |
 | 10 GHz | `nw:41 nh:21 b:0.3` | **116.7 (+91 %)** |
 
-The shipped mesh under-predicts conductor loss by ~2× at 10 GHz and prints no
-diagnostic. Caveat: the refined-mesh figures are not converged values — the
-`b: 0.3` trace mesh has ~0.4 µm elements at up to 2.8 mm range (d/h ≈ 7·10³),
-so they carry some of the cancellation error from finding 1. The conclusion
-(shipped mesh is mesh-limited by ~2× at 10 GHz) stands; the exact refined
-number should not be quoted. Add a warning in `build_elements()` (or after the fill) when the
-smallest element dimension of any conductor exceeds ~δ/2, naming the conductor
-and the ratio; optionally refuse when it exceeds ~2δ. Document the rule in
-`YAML_USER_GUIDE.md` next to the mesh parameters.
+The reported resistance changes by nearly 2× at 10 GHz when the trace mesh is
+refined, without a diagnostic. This demonstrates mesh sensitivity, not a proven
+factor-of-two error against the true solution. Neither mesh is a converged
+reference, and cancellation from finding 1 can contaminate the refined result.
+Establish a stable, converged reference before assigning an accuracy bound.
+
+Add a warning based on the actual surface-element widths and heights in the
+relevant surface-normal directions, identifying the conductor, direction, and
+size/δ ratio. Checking only the smallest element dimension is insufficient:
+a narrow but tall element can still under-resolve current variation through
+its height. Account for graded meshes and conductors thinner than δ rather than
+requiring every interior element to be small in both directions. A threshold
+such as δ/2 is a heuristic to validate with convergence studies, not an accuracy
+guarantee or an established reason to reject input. Document the criterion in
+`YAML_USER_GUIDE.md` alongside the mesh parameters.
 
 ## 4. [robustness] Geometry is never validated; overlapping / inverted stack-ups run silently
 
