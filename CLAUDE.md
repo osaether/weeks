@@ -8,13 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Check dependencies (requires libmeschach-dev and libyaml-dev)
 make check-deps
 
-# Build
+# Build (objects go to build/, executable is ./weeks)
 make
 
-# Run (always reads from test.yaml in the current directory)
+# Run — optional input filename; defaults to test.yaml in the current directory
 ./weeks
+./weeks examples/test_fr4.yaml
+./weeks --help
 
-# Run with preset material examples (copies example file to test.yaml, then runs)
+# Run preset material examples (passes the example path directly; nothing is copied)
 make test-fr4       # FR4 substrate
 make test-air       # Air baseline
 make test-rogers    # Rogers RO4003C
@@ -29,11 +31,48 @@ make check-z0
 make clean
 ```
 
-The C program itself has no automated test suite; validate by sanity-checking the R/L/|Z| matrices for finite, symmetric values. Note that changing only the substrate material (air vs FR4) does **not** change the R/L/|Z| matrices — but it **does** change the TRANSMISSION-LINE PARAMETERS section (Z0, C, attenuation, γ). See "Notes on the codebase" below.
+## Tests
 
-For independent numerical validation there is a Python cross-check harness in `tools/fh_crosscheck/` that compares `weeks`' per-unit-length R/L against [FastHenry](https://www.fastfieldsolvers.com/). Run it with `make check-fasthenry` (or `python3 -m tools.fh_crosscheck <case.yaml>`); its own unit tests run with `python3 -m pytest tools/fh_crosscheck/`. See `docs/fasthenry-crosscheck.md` for setup (FastHenry has no apt package; build from source with `-fcommon` on GCC 10+). This harness confirmed the ground-return resistance fix in `calcl.c` (single-line R agrees with FastHenry to ~1%).
+All tests are Python/pytest and must be run from the repo root (they import
+`tools.fh_crosscheck`). Only the C build deps plus `pytest` are needed; FastHenry
+is not required.
 
-A second harness in `tools/microstrip_z0/` (stdlib-only Python, no external solver) sanity-checks `weeks`' per-line characteristic impedance Z0 against the Hammerstad-Jensen microstrip closed form, independently validating the PEEC inductance. Run it with `make check-z0` (or `python3 -m tools.microstrip_z0 <case.yaml>`); tests run with `python3 -m pytest tools/microstrip_z0/`. Both `weeks` and the closed form use the same substrate height — the geometric trace-to-ground gap — so the comparison is consistent by construction. `examples/test_microstrip.yaml` agrees to ~0.03%; the multi-line examples show a few percent (per-line H-J ignores inter-line coupling).
+```bash
+python3 -m pytest -q                                   # everything (what CI runs)
+python3 -m pytest tests/ -q                            # C-program regression tests
+python3 -m pytest tools/fh_crosscheck/ tools/microstrip_z0/ -q   # harness unit tests
+python3 -m pytest tests/test_regressions.py -k "cli_diagnostics" -q   # single test
+```
+
+- `tests/test_regressions.py` tests the real C program: `tests/conftest.py` copies
+  `src/`, `include/` and the `Makefile` into a temp dir, runs `make` there, and the
+  `run_weeks` fixture writes YAML to a per-test `test.yaml` and runs the binary on it.
+  Assertions parse stdout (the `TRANSMISSION-LINE PARAMETERS` table) and check stderr
+  for `ERROR`/`Warning` text, so output wording is part of the tested contract.
+- These cover input validation (invalid numbers, truncated/malformed YAML, aliases,
+  >10 conductors), CLI behaviour, mesh warnings, dielectric-loss units, and Makefile
+  header-dependency rebuilds. Add a regression here when fixing a bug in the C code.
+- CI (`.github/workflows/ci.yml`) runs `make check-deps`, `make`, then `python -m pytest -q`.
+
+For numerical validation beyond the regression tests there are two stdlib-only Python
+harnesses in `tools/`:
+
+- `tools/fh_crosscheck/` compares `weeks`' per-unit-length R/L against
+  [FastHenry](https://www.fastfieldsolvers.com/) (`make check-fasthenry` or
+  `python3 -m tools.fh_crosscheck <case.yaml>`). See `docs/fasthenry-crosscheck.md` for
+  setup (FastHenry has no apt package; build from source with `-fcommon` on GCC 10+).
+  Single-line R agrees with FastHenry to ~1%; with uniform meshes (`b: 1.0`) all
+  self/mutual R/L terms agree within ~2.3%.
+- `tools/microstrip_z0/` checks per-line Z0 against the Hammerstad-Jensen microstrip
+  closed form (`make check-z0` or `python3 -m tools.microstrip_z0 <case.yaml>`); it
+  reuses `fh_crosscheck`'s `geometry`/`parse_weeks`. Both `weeks` and the closed form
+  use the same substrate height (the geometric trace-to-ground gap), so the comparison
+  is consistent by construction. `examples/test_microstrip.yaml` agrees to ~0.03%;
+  multi-line examples show a few percent (per-line H-J ignores inter-line coupling).
+
+Manual sanity check: R/L/|Z| matrices should be finite and symmetric. Changing only
+the substrate material (air vs FR4) does **not** change them — but it **does** change
+the TRANSMISSION-LINE PARAMETERS section. See "Notes on the codebase" below.
 
 ## Architecture
 
@@ -41,7 +80,7 @@ This is a C command-line tool implementing the Partial Element Equivalent Circui
 
 ### Data flow
 
-1. `input.c` parses `test.yaml` → populates `conductor[]` array and sets `global_frequency`
+1. `input.c` parses the input YAML (`getinput()`) → populates `conductor[]` array and sets `global_frequency`
 2. `build.c` discretizes each conductor into rectangular elements → `element[]` array
 3. `calcl.c` fills the complex impedance matrix Z (M×M, where M = total mesh elements across all conductors)
 4. `weeks.c` (main) inverts Z, then aggregates element-level admittances back to per-conductor quantities → N×N result matrices for R, L, and |Z|
@@ -50,9 +89,11 @@ This is a C command-line tool implementing the Partial Element Equivalent Circui
 ### Key structural details
 
 - **`conductor[0]` is always the ground plane**; `conductor[1..N]` are signal traces
-- `global_frequency` in `input.c` is accessed via `extern double global_frequency` in `weeks.c`
-- The executable hardcodes the input filename as `"test.yaml"` — there is no CLI argument for the input file
-- Maximum 10 conductors (`MAX_CONDUCTORS` defined in `include/weeks.h`)
+- `global_frequency` in `input.c` (default 30 MHz if `frequency:` is omitted) is accessed via `extern double global_frequency` in `weeks.c`
+- `main()` takes one optional argument, the input filename (default `test.yaml`); `-h`/`--help` prints usage, more than one argument or an unopenable file exits 1
+- Maximum 10 conductors (`MAX_CONDUCTORS` in `include/weeks.h`); more is a hard error, never a silent truncation
+- Input validation is all-or-nothing: any invalid conductor or malformed YAML aborts with `ERROR` on stderr and a non-zero exit before any calculation runs. Unknown keys and nested metadata mappings are ignored; `substrate_h` is ignored with a note
+- Two non-fatal warnings go to stderr: `build.c` warns when a graded mesh (`b < 1`) has an even `nw`/`nh` (mesh not symmetric), `weeks.c` warns when the ground plane has a single element
 - Copper conductivity is hardcoded as `sigma = 58e6` S/m in `calcl.c`
 
 ### Source files
@@ -64,6 +105,7 @@ This is a C command-line tool implementing the Partial Element Equivalent Circui
 | `src/calcl.c` | Builds impedance matrix; adds each filament's self-resistance (ground plane + signal). Computes Hammerstad-Jensen effective εr / dielectric loss (**not** applied to the R/L matrix). `calc_line_params()` here uses them to produce the per-line transmission-line output (Z0, C, attenuation, γ) |
 | `src/build.c` | Creates mesh elements from conductor geometry |
 | `src/lpp.c` | Neumann partial inductance formula (`lp()`) |
+| `tests/` | pytest regression suite that builds and runs the real C binary (see Tests) |
 | `tools/fh_crosscheck/` | Python (stdlib-only) FastHenry R/L cross-check harness; not part of the C build |
 | `tools/microstrip_z0/` | Python (stdlib-only) Z0 sanity check vs the Hammerstad-Jensen closed form; reuses `fh_crosscheck`'s `geometry`/`parse_weeks`; not part of the C build |
 
